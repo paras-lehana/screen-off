@@ -54,8 +54,8 @@ public sealed class CorsairLighting : IDisposable {
     }
     static string StateText(int value) {
         switch(value) {
-            case 3: return "iCUE did not answer the SDK within 15 s (session state 3). iCUE pauses its SDK while Windows is locked or used over Remote Desktop; otherwise check that the SDK is enabled in iCUE settings.";
-            case 4: return "iCUE refused the SDK connection (session state 4). Enable the SDK in iCUE settings.";
+            case 3: return "iCUE did not answer the SDK within 15 s (session state 3). iCUE pauses its SDK while Windows is locked or used over Remote Desktop; otherwise check iCUE Settings > Software and Games > Software Integrations.";
+            case 4: return "iCUE refused the SDK connection (session state 4). Turn on iCUE Settings > Software and Games > Software Integrations (iCUE 5: Settings > SDK).";
             case 5: return "iCUE closed the SDK connection (session state 5).";
             default: return "iCUE SDK session state "+value;
         }

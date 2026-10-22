@@ -54,10 +54,10 @@ changing any colour. Device-by-device results: [SUPPORT.md](SUPPORT.md).
 
 1. `.\Get-CorsairSdk.ps1` downloads Corsair's official iCUE SDK 4.0.84 release and checks its
    SHA-256 before extracting it into `vendor\` (not committed).
-2. In iCUE turn the SDK on. iCUE 4: Settings (gear) > Software and Games > enable the SDK.
+2. In iCUE turn the SDK on. iCUE 4: Settings (gear) > Software and Games > **Software Integrations**.
    iCUE 5: Settings > SDK > iCUE SDK.
-3. Use the PC directly. iCUE pauses its SDK while Windows is locked or used over Microsoft
-   Remote Desktop, so checks there report that instead of your devices.
+3. Use the PC directly. While Windows is locked or used over Microsoft Remote Desktop, iCUE pauses
+   its SDK and even empties its device list, so checks there report that instead of your devices.
 
 When Screen Off releases control, iCUE returns to your own profile and effects.
 

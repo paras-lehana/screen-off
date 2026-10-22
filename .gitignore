@@ -1,0 +1,32 @@
+# Personal state and diagnostics
+settings.ini
+screen-off.log
+logs/
+backups/
+experiments/
+recovery/*.log
+*.status
+*.stop
+
+# Third-party downloads (Get-CorsairSdk.ps1 fetches the iCUE SDK) and local package caches
+vendor/
+
+# Build outputs
+LightingHost/bin/
+LightingHost/obj/
+LightingHost/publish/
+*.msix
+
+# Retired: the original DDC/CI power-off version and its probes. DDC "off" left a
+# Samsung Odyssey G7 unreachable (see recovery/README.md); never ship it.
+ScreenOff.ahk
+Monitors.ahk
+probe.ahk
+recover-displays.ahk
+monitor-support.ini
+controlmymonitor-monitors-*.txt
+diagnose-*.ahk
+AuraLighting.ahk
+
+# Owner's article drafts
+docs/

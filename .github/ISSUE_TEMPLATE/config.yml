@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Monitor stuck off after a DDC/CI power command
+    url: https://github.com/paras-lehana/screen-off/blob/main/recovery/README.md
+    about: Recovery steps for monitors that stay dark with only the power LED on.

@@ -1,0 +1,34 @@
+name: Bug report
+description: Something did not work as described.
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Screen Off version
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What you did
+      placeholder: Pressed Ctrl+Alt+F12, waited 10 minutes, pressed Space...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Lighting systems ticked and hardware
+      placeholder: Aura (profile) + Corsair (keyboard); two monitors over DisplayPort
+  - type: textarea
+    id: log
+    attributes:
+      label: screen-off.log and logs\rgb-*.log excerpts
+      description: Remove serial numbers.
+      render: text

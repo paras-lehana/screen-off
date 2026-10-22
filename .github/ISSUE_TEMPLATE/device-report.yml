@@ -1,0 +1,64 @@
+name: Device report
+description: Tell us whether Screen Off works with your monitor or RGB hardware.
+title: "[Device] <model>"
+labels: ["device report"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks! Reports go into SUPPORT.md. Please remove serial numbers from anything you paste.
+        Describe what you saw with your own eyes; "the log says applied" is not the same as dark.
+  - type: input
+    id: version
+    attributes:
+      label: Screen Off version
+      description: Shown in the tray tooltip, e.g. 1.11
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Device type
+      options: [Monitor, RGB device]
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Brand and model
+      placeholder: e.g. Samsung Odyssey G7 32" LC32G75TQS, or Corsair K100 RGB
+    validations:
+      required: true
+  - type: input
+    id: connection
+    attributes:
+      label: Connection or lighting system
+      placeholder: e.g. DisplayPort 1.4 at 240 Hz, or Corsair iCUE (keyboard)
+    validations:
+      required: true
+  - type: input
+    id: software
+    attributes:
+      label: Software versions
+      placeholder: Windows 11 24H2, iCUE 5.52, Armoury Crate ..., OpenRGB 1.1, GPU driver ...
+  - type: dropdown
+    id: result
+    attributes:
+      label: Result you observed
+      options:
+        - Worked - went dark, stayed dark, came back as before
+        - Partial - see details
+        - Did not work
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What went dark, what stayed lit, how long you watched, what happened on wake.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs (optional)
+      description: The matching logs\rgb-*.log or the "Check ticked systems" result.
+      render: text

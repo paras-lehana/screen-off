@@ -5,7 +5,8 @@
   apps are switched off afterwards, out of sight. Pressing the wake key during that step stops it.
 - Waking now restores lighting and closes the apps while the screens are still dark; the screens
   come back only afterwards. A lighting system interrupted mid-switch is still waited for.
-- The Cancel button and Esc during preparation are gone: the wake key is the one way back.
+- The notice has no Cancel button; **Esc is the only cancel**. It works until the lights have finished
+  switching off, restoring lights then screens without locking. The wake key is a plain wake.
 - Emergency exit and shutdown finish the same sequence synchronously.
 
 ## 1.11 â€” 22 October 2026

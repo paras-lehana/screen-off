@@ -51,7 +51,7 @@ if !wakeVk
 ReleaseKeys(offHotkey, wakeKey)
 Hotkey(offHotkey, TurnOff)
 Hotkey("^!Esc", EmergencyExit)
-HotIf((*) => busy && !active)
+HotIf((*) => busy)
 Hotkey("Esc", (*) => CancelPreparation())
 HotIf((*) => active)
 for button in ["LButton", "RButton", "MButton", "XButton1", "XButton2",
@@ -132,7 +132,7 @@ TurnOff(*) {
     if mode != "--check" {
         UpdateTray("Turning off")
         ShowNotice("Turning off screen and lights...", "Screens go dark now; lights and apps are handled next, out of sight."
-            . "`n" wakeKey " wakes everything: lights first, then the screens."
+            . "`n" wakeKey " wakes everything: lights first, then the screens. Esc cancels."
             . "`nYour apps keep running.", noticeDurationMs)
     }
     Log("Off requested" (mode = "--check" ? " (read-only activation check)." : "."))
@@ -203,11 +203,18 @@ TurnOff(*) {
 ; Cancelled by a lock during preparation, or by a wake request once the screens are off.
 IsPreparationCancelled() => PreparationShouldStop(preparationCancellation, lightingBusy, active)
 
-CancelPreparation(reason := "Cancelled by you.") {
+; Esc is the only user cancel. Before the screens are off it just stops preparation; once they
+; are off it restores lights, then screens, without locking. restoreScreens := false is for an
+; external Windows lock, which never counts as the user's cancel.
+CancelPreparation(reason := "Cancelled with Esc.", restoreScreens := true) {
     global preparationCancellation
-    if busy && !active {
-        preparationCancellation := reason
-        lighting.Restore()
+    if !busy
+        return
+    preparationCancellation := reason
+    lighting.Restore()
+    if active && restoreScreens {
+        Log("Esc pressed: restoring lights, then screens.")
+        Restore()
     }
 }
 
@@ -325,7 +332,7 @@ LockFailed(message) {
 SessionChanged(event, sessionId, *) {
     if event = 7 {
         Log("Windows confirmed session locked.")
-        CancelPreparation("Windows locked during preparation.")
+        CancelPreparation("Windows locked during preparation.", false)
         if active {
             Restore(false) ; External lock: release input without forcing wake.
         }
@@ -337,8 +344,12 @@ SessionChanged(event, sessionId, *) {
 }
 
 EmergencyKey(hook, vk, sc) {
-    if vk = 0x1B && GetKeyState("Ctrl", "P") && GetKeyState("Alt", "P")
+    if vk != 0x1B
+        return
+    if GetKeyState("Ctrl", "P") && GetKeyState("Alt", "P")
         EmergencyExit()
+    else if busy
+        CancelPreparation()
 }
 
 EmergencyExit(*) {

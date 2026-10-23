@@ -18,6 +18,7 @@ the room goes dark, the PC keeps working, and a stray mouse bump does not wake t
 - Apps the utility opens (Armoury Crate) are closed again after every change, so nothing is left on
   screen. iCUE keeps running in the tray, as the Corsair SDK needs it.
 - While dark, mouse movement, clicks and other keys are ignored, so they do not wake the screens.
+  **Esc** is the only cancel: while the lights are still switching off it restores everything.
 - **Ctrl+Alt+Esc**: restore everything and exit.
 - After wake it checks every monitor came back and tells you if one did not.
 - A tray icon shows the state, keys and the lighting systems in use; double-click for Settings.

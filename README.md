@@ -52,8 +52,9 @@ changing any colour. Device-by-device results: [SUPPORT.md](SUPPORT.md).
 
 ### Corsair setup
 
-1. `.\Get-CorsairSdk.ps1` downloads Corsair's official iCUE SDK 4.0.84 release and checks its
-   SHA-256 before extracting it into `vendor\` (not committed).
+1. `.\Get-CorsairSdk.ps1` downloads Corsair's official iCUE SDK releases and checks each SHA-256
+   before extracting into `vendor\` (not committed). iCUE 4 needs SDK 4.0.48 (it rejects the newer
+   4.0.84 at handshake); iCUE 5 uses 4.0.84. The worker picks the right one automatically.
 2. In iCUE turn the SDK on. iCUE 4: Settings (gear) > Software and Games > **Software Integrations**.
    iCUE 5: Settings > SDK > iCUE SDK.
 3. Use the PC directly. While Windows is locked or used over Microsoft Remote Desktop, iCUE pauses

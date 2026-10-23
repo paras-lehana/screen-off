@@ -12,7 +12,16 @@ $ErrorActionPreference = 'Stop'
 # iCUE can mirror other vendors' boards, and those belong to their own controller.
 $TYPE_BITS = @{ keyboard=0x1; mouse=0x2; mousemat=0x4; headset=0x8; headsetstand=0x10
     fancontroller=0x20; ledcontroller=0x40; memory=0x80; cooler=0x100; gamecontroller=0x1000 }
-$SDK_DLL = Join-Path $PSScriptRoot 'vendor\iCUESDK_4.0.84\iCUESDK\redist\x64\iCUESDK.x64_2019.dll'
+# iCUE 4.x speaks SDK protocol 4.0.12 and rejects the 4.0.84 client ("handshake failed");
+# iCUE 5.x needs the newer one. Pick the SDK by the installed iCUE's major version.
+function Get-SdkDll {
+    $icue = Get-Process -Name iCUE -ErrorAction SilentlyContinue | Select-Object -First 1
+    $major = 5
+    if ($icue -and $icue.Path) { $major = (Get-Item -LiteralPath $icue.Path).VersionInfo.FileMajorPart }
+    $version = if ($major -le 4) { '4.0.48' } else { '4.0.84' }
+    Join-Path $PSScriptRoot "vendor\iCUESDK_$version\iCUESDK\redist\x64\iCUESDK.x64_2019.dll"
+}
+$SDK_DLL = $null
 # Exclusive control keeps iCUE from overwriting black, so refresh rarely: Corsair reports
 # CorsairSetLedColors can stop returning after hours of rapid calls (cue-sdk issue 32).
 $FRAME_MS = 2000
@@ -30,8 +39,9 @@ try {
         $mask = $mask -bor $TYPE_BITS[$name]
     }
     if ($mask -eq 0) { throw 'No Corsair device types selected.' }
-    if (-not (Test-Path -LiteralPath $SDK_DLL)) { throw "iCUE SDK DLL missing: $SDK_DLL (see README: Corsair setup)." }
     if (-not (Get-Process -Name iCUE -ErrorAction SilentlyContinue)) { throw 'iCUE is not running. Start iCUE (the SDK talks to it).' }
+    $SDK_DLL = Get-SdkDll
+    if (-not (Test-Path -LiteralPath $SDK_DLL)) { throw "iCUE SDK DLL missing: $SDK_DLL. Run Get-CorsairSdk.ps1." }
     # iCUE stops its SDK server while the session is locked or remote (its log: "Session active changed: false").
     Add-Type -AssemblyName System.Windows.Forms
     if ([System.Windows.Forms.SystemInformation]::TerminalServerSession) { throw 'This is a Remote Desktop session; iCUE pauses its SDK until you sign in at the PC itself.' }

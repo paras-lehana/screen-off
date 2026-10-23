@@ -1,6 +1,9 @@
 # Changelog
 
 ## 1.11 — 22 October 2026
+- Corsair SDK version fix (23 Oct): iCUE 4.33 speaks SDK protocol 4.0.12 and rejected the 4.0.84
+  client ("handshake failed", shown as state 4). The worker now uses SDK 4.0.48 with iCUE 4 and
+  4.0.84 with iCUE 5; `Get-CorsairSdk.ps1` fetches both. K100 verified on hardware.
 - Settings > Lighting: switch each lighting system on or off independently (ASUS Aura, Corsair
   iCUE, OpenRGB, Windows Dynamic Lighting) and choose which Corsair device types to control.
   Aura and Corsair run together; OpenRGB and Dynamic Lighting run alone.

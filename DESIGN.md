@@ -1,5 +1,10 @@
 # Screen Off desktop UI
 
+## Version 1.12
+
+User experience order: off = screens first, then lights and apps unseen; wake = lights and apps
+first while dark, then the screens. The notice no longer offers Cancel; the wake key is the way back.
+
 ## Version 1.11
 
 The Lighting tab lists every lighting system as its own checkbox, with Corsair device types in a

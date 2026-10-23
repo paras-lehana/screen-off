@@ -10,10 +10,13 @@ the room goes dark, the PC keeps working, and a stray mouse bump does not wake t
 
 ## What it does
 
-- **Ctrl+Alt+F12** (configurable): black covers appear on every screen, the selected lighting
-  systems go dark, then Windows puts the monitors into standby. The PC stays awake.
-- **Space** (configurable), press and release: lighting, input and screens come back, then Windows
-  locks if you enabled "Require Windows sign-in after recovery".
+- **Ctrl+Alt+F12** (configurable): the screens go dark first (black covers, then Windows standby),
+  and only then are the lighting systems and their apps switched off, out of sight. The PC stays awake.
+- **Space** (configurable), press and release: input is freed and lighting is restored *while the
+  screens are still dark*; only when that is done do the screens come back. Windows then locks if
+  you enabled "Require Windows sign-in after recovery".
+- Apps the utility opens (Armoury Crate) are closed again after every change, so nothing is left on
+  screen. iCUE keeps running in the tray, as the Corsair SDK needs it.
 - While dark, mouse movement, clicks and other keys are ignored, so they do not wake the screens.
 - **Ctrl+Alt+Esc**: restore everything and exit.
 - After wake it checks every monitor came back and tells you if one did not.
@@ -86,14 +89,16 @@ turns anything off, and is refused while the screens are off or recovering.
 ## How it works
 
 `ScreenOffWindows.ahk` is the resident tray app. On the off hotkey it waits for the keys to be
-released, covers each monitor with a black window, starts one worker process per lighting system
-(`AuraProfileWorker.ps1`, `AuraWorker.ps1`, `CorsairWorker.ps1`, or the .NET `LightingHost` for
-OpenRGB and Dynamic Lighting), waits for each to report that black was applied, then sends Windows
-display standby. Input hooks swallow mouse and keyboard input until the wake key is released.
+released, covers each monitor with a black window, blocks input and sends Windows display standby.
+Only then does it start one worker process per lighting system (`AuraProfileWorker.ps1`,
+`AuraWorker.ps1`, `CorsairWorker.ps1`, or the .NET `LightingHost` for OpenRGB and Dynamic Lighting)
+and wait for each to report that black was applied. Input hooks swallow mouse and keyboard input
+until the wake key is released.
 Windows sometimes wakes the display on its own; the utility puts it back to standby, so a brief
 flash is possible.
 
-On wake it releases input, removes the covers, tells every worker to restore and asks Windows for
+On wake it releases input and tells every worker to restore while the covers and standby stay in
+place. Once every worker has released (at most 20 s), it removes the covers and asks Windows for
 the display. It locks the session only after Windows confirms the display is on and every worker
 has released its devices. A worker that does not exit within 12 s is ended, which makes its vendor
 service restore lighting.
@@ -110,7 +115,7 @@ Physical behaviour still needs a person watching the hardware; please report it 
 
 ## Status
 
-Version 1.11. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
+Version 1.12. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
 for what has been confirmed on real hardware and what is only implemented.
 
 ## License

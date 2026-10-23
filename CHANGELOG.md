@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.12 — 23 October 2026
+- Turning off now starts with the screens (covers, input block, Windows standby); lighting and its
+  apps are switched off afterwards, out of sight. Pressing the wake key during that step stops it.
+- Waking now restores lighting and closes the apps while the screens are still dark; the screens
+  come back only afterwards. A lighting system interrupted mid-switch is still waited for.
+- The Cancel button and Esc during preparation are gone: the wake key is the one way back.
+- Emergency exit and shutdown finish the same sequence synchronously.
+
 ## 1.11 — 22 October 2026
 - Corsair SDK version fix (23 Oct): iCUE 4.33 speaks SDK protocol 4.0.12 and rejected the 4.0.84
   client ("handshake failed", shown as state 4). The worker now uses SDK 4.0.48 with iCUE 4 and

@@ -201,7 +201,7 @@ TurnOff(*) {
 }
 
 ; Cancelled by a lock during preparation, or by a wake request once the screens are off.
-IsPreparationCancelled() => preparationCancellation != "" || (busy && !active)
+IsPreparationCancelled() => PreparationShouldStop(preparationCancellation, lightingBusy, active)
 
 CancelPreparation(reason := "Cancelled by you.") {
     global preparationCancellation

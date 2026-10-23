@@ -50,7 +50,12 @@ try {
     trace := PreparationTrace(), trace.startupFails := true
     Fails(trace,Error,"Startup error prevents standby")
     Check(trace.events="start,","Failed startup must not progress")
-    FileAppend("PASS 9 preparation checks; readiness only, no notification delay or hardware calls.`n","*")
+    ; Regression: busy but not yet active (normal start of an off request) is not a cancel.
+    Check(!PreparationShouldStop("", false, false),"Start of an off request must not count as cancelled")
+    Check(!PreparationShouldStop("", true, true),"Lighting step with screens off continues")
+    Check(PreparationShouldStop("", true, false),"Wake during the lighting step stops it")
+    Check(PreparationShouldStop("Windows locked", false, false),"A lock cancels preparation")
+    FileAppend("PASS 13 preparation checks; readiness only, no notification delay or hardware calls.`n","*")
 } catch Error as testError {
     FileAppend("FAIL " testError.Message "`n","**")
     ExitApp(1)

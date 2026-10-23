@@ -66,6 +66,19 @@ try {
     lights := SetOf(FakeController("Aura","ok","restored","Aura: worker stopped"), FakeController("Corsair"))
     lights.Darken()
     Check(lights.CheckHealth()="Aura: worker stopped", "Health reports the first active problem")
+    ; Wake pressed while the second system was still switching off: it must still be awaited.
+    first := FakeController("Aura"), second := FakeController("Corsair","cancel","pending")
+    lights := SetOf(first, second)
+    try lights.Darken()
+    catch PreparationCancelled
+        checks += 0
+    Check(lights.RestoreStatus()="pending", "Interrupted system keeps the screens from returning")
+    second.status := "restored"
+    Check(lights.RestoreStatus()="restored", "Screens may return once every started system is restored")
+    ; A system that failed to start never blocks the wake.
+    lights := SetOf(FakeController("Aura"), FakeController("Corsair","fail","pending"))
+    lights.Darken()
+    Check(lights.RestoreStatus()="restored", "A skipped system is not awaited")
     FileAppend("PASS " checks " lighting-set checks; fake controllers only.`n", "*")
 } catch Error as testError {
     FileAppend("FAIL " testError.Message "`n", "**")

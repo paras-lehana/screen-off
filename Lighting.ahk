@@ -112,6 +112,7 @@ class LightingSet {
                 this.controllers.Push(LightingController(kind, cfg))
         this.active := []
         this.skipped := []
+        this.skippedControllers := []
     }
     Describe() => ScreenOffConfig.Describe(this.cfg)
     ; A running worker blocks reconfiguration until it has released its devices.
@@ -124,7 +125,7 @@ class LightingSet {
         }
     }
     Darken(isCancelled := 0) {
-        this.active := [], this.skipped := []
+        this.active := [], this.skipped := [], this.skippedControllers := []
         for controller in this.controllers {
             try {
                 controller.Darken(isCancelled)
@@ -134,6 +135,7 @@ class LightingSet {
                 throw err
             } catch Error as err {
                 this.skipped.Push(controller.label ": " err.Message)
+                this.skippedControllers.Push(controller)
                 Log("Lighting skipped - " controller.label ": " err.Message)
             }
         }
@@ -150,9 +152,16 @@ class LightingSet {
         for controller in this.controllers
             controller.Restore()
     }
+    ; Every system that was started counts, including one interrupted before it finished
+    ; turning lights off: the screens must not return while its app is still busy.
     RestoreStatus() {
         result := "restored"
-        for controller in this.active {
+        for controller in this.controllers {
+            skipped := false
+            for skippedOne in this.skippedControllers
+                skipped := skipped || skippedOne = controller
+            if skipped
+                continue
             status := controller.RestoreStatus()
             if status = "pending"
                 return "pending"

@@ -9,9 +9,9 @@
 #Include WakeLock.ahk
 #Include DisplayPresence.ahk
 ; Windows display standby and temporary Aura control; no monitor DDC commands.
-VERSION := "1.11"
+VERSION := "1.12"
 ; Armoury Crate is closed after each lighting change, so wake restarts it (owner, 21 Oct).
-WAKE_LIGHTING_TIMEOUT_MS := 15000
+WAKE_LIGHTING_TIMEOUT_MS := 30000
 mode := A_Args.Length ? A_Args[1] : ""
 settings := A_ScriptDir "\settings.ini"
 offHotkey := IniRead(settings, "Keys", "OffHotkey", "^!F12")
@@ -27,6 +27,9 @@ powerRegistration := 0
 sessionRegistration := false
 exitAfterWake := false
 screensBefore := Map()
+lightingBusy := false
+wakeEarly := false
+wakeFinishStarted := 0
 wakeGate := WakeLockGate(IniRead(settings, "Security", "LockOnWake", "1") = "1",
     Restore, LockCurrentSession, LockFailed, WakeComplete, WAKE_LIGHTING_TIMEOUT_MS)
 lighting := 0
@@ -121,60 +124,66 @@ SetDisplayPower(state) {
 }
 
 TurnOff(*) {
-    global active, busy, sawOff, unexpectedWakes, preparationCancellation, screensBefore
+    global active, busy, sawOff, unexpectedWakes, preparationCancellation, screensBefore, lightingBusy
     if active || busy || wakeGate.pending
         return
     busy := true
     preparationCancellation := ""
     if mode != "--check" {
-        UpdateTray("Preparing")
-        ShowNotice("Turning off screen and lights...", "Release the shortcut. Preparing lighting first."
-            . "`nStandby starts as soon as lighting is ready."
-            . "`n" wakeKey " wakes afterward. Your apps keep running."
-            . "`nEsc or Cancel stops preparation.", noticeDurationMs, (*) => CancelPreparation())
+        UpdateTray("Turning off")
+        ShowNotice("Turning off screen and lights...", "Screens go dark now; lights and apps are handled next, out of sight."
+            . "`n" wakeKey " wakes everything: lights first, then the screens."
+            . "`nYour apps keep running.", noticeDurationMs)
     }
     Log("Off requested" (mode = "--check" ? " (read-only activation check)." : "."))
     try {
         WaitForReleasedInputs(offHotkey, wakeKey)
         CheckPreparationCancellation(IsPreparationCancelled)
-        ; Keep BOTH display and system awake only while lighting prepares.
-        if !DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000003, "uint")
-            throw Error("Cannot keep Windows/display awake; cancelling preparation.")
+        if !DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000001, "uint")
+            throw Error("Cannot keep Windows awake; cancelling.")
         if mode = "--check" {
             FileAppend("PASS release check, hotkeys, power/session subscriptions and keep-awake request; backend availability not checked; no lighting/display writes or DDC.`n", "*")
             ExitApp(0)
         }
-        ; Black covers first, so Armoury Crate opening for the lighting change is hidden.
-        ShowCurtains()
-        RaiseNotice()
-        WaitForLightingBeforeStandby(ObjBindMethod(lighting,"Darken"),
-            ObjBindMethod(lighting,"CheckHealth"), IsPreparationCancelled)
-        WaitForReleasedInputs(offHotkey, wakeKey)
-        CheckPreparationCancellation(IsPreparationCancelled)
-        if problem := lighting.CheckHealth()
-            throw Error("Lighting stopped before standby: " problem)
+        ; 1) Screens first: black covers, input block, then Windows display standby.
         Critical("On")
-        CheckPreparationCancellation(IsPreparationCancelled)
-        ; Keep the notice's independent expiry timer. Curtains/standby obscure it;
-        ; it never keeps the display on or delays input suppression.
-        ; Drop only the display requirement. Apps/system remain awake while dark.
-        if !DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000001, "uint")
-            throw Error("Cannot retain the keep-awake request; cancelling standby.")
         screensBefore := AttachedScreens()
         active := true
         sawOff := false
         unexpectedWakes := 0
         keyboard.Start()
         BlockInput("MouseMove")
+        ShowCurtains()
+        RaiseNotice()
         UpdateTray("Off")
         SetDisplayPower(2)
-        SetTimer(CheckLighting, 5000)
         Log("Windows display-off requested for " MonitorGetCount() " display(s): " DescribeScreens(screensBefore) ".")
+        Critical("Off")
+        ; 2) Then the lighting systems and their apps (Armoury Crate opens and closes unseen).
+        lightingBusy := true
+        try {
+            WaitForLightingBeforeStandby(ObjBindMethod(lighting,"Darken"),
+                ObjBindMethod(lighting,"CheckHealth"), IsPreparationCancelled)
+        } catch PreparationCancelled {
+            Log("Lighting preparation stopped: wake requested.")
+            return ; the wake path restores lighting, then the screens
+        } catch Error as lightingError {
+            ; Every lighting system failed: nothing else to wait for, bring the screens back.
+            Log("No lighting system could be controlled: " lightingError.Message)
+            Restore()
+            ShowNotice("Lights were not turned off", lightingError.Message)
+            return
+        } finally {
+            lightingBusy := false
+        }
+        SetTimer(CheckLighting, 5000)
+        if wakeEarly
+            RequestWake()
         if mode = "--test-cycle"
             SetTimer(FinishTest, -12000)
     } catch Error as err {
         try Restore()
-        try HideCurtains() ; Restore() skips covers while preparation is not yet active.
+        try HideCurtains() ; Restore() keeps the covers until lighting is released.
         try lighting.Restore()
         DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000000, "uint")
         Log("Off cancelled: " err.Message)
@@ -191,7 +200,8 @@ TurnOff(*) {
     }
 }
 
-IsPreparationCancelled() => preparationCancellation != ""
+; Cancelled by a lock during preparation, or by a wake request once the screens are off.
+IsPreparationCancelled() => preparationCancellation != "" || (busy && !active)
 
 CancelPreparation(reason := "Cancelled by you.") {
     global preparationCancellation
@@ -247,8 +257,17 @@ WakeOnRelease(hook, vk, sc) {
 }
 
 RequestWake() {
+    global wakeEarly
     if !active || wakeGate.pending
         return
+    if lightingBusy {
+        ; Stop the lighting step first; the wake itself follows from that.
+        wakeEarly := true
+        Log("Wake requested while lighting was being turned off; stopping that step.")
+        SetTimer(RequestWake, -150)
+        return
+    }
+    wakeEarly := false
     Log("Wake requested; lock-on-wake=" wakeGate.enabled ".")
     wakeGate.Request(A_TickCount)
     if wakeGate.pending {
@@ -329,12 +348,14 @@ EmergencyExit(*) {
         RequestWake()
         return
     }
-    Restore()
+    Restore(true, true)
     ExitApp()
 }
 
-Restore(restoreDisplay := true, *) {
-    global active
+; Wake order: release input, restore lighting and apps while the screens are still dark
+; (covers up, display in standby), and only then bring the screens back.
+Restore(restoreDisplay := true, synchronous := false, *) {
+    global active, wakeFinishStarted
     HideNotice() ; Never show a stale "turning off" message after wake/cancel.
     if !active {
         if IsObject(lighting)
@@ -346,26 +367,47 @@ Restore(restoreDisplay := true, *) {
     SetTimer(ReapplyOff, 0)
     SetTimer(CheckLighting, 0)
     try {
-        ; Release input and covers before requesting power or waiting on a worker.
         keyboard.Stop()
         BlockInput("MouseMoveOff")
-        HideCurtains()
         lighting.Restore()
-        if restoreDisplay {
-            SetDisplayPower(-1)
-            DllCall("Kernel32\SetThreadExecutionState", "uint", 0x2, "uint")
-        }
+        if !restoreDisplay
+            HideCurtains() ; external lock: the lock screen is already showing
     } finally {
         try keyboard.Stop()
         try BlockInput("MouseMoveOff")
-        try HideCurtains()
-        DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000000, "uint")
         Critical("Off")
-        ; Input is released before the service call, even if Aura takes time.
-        lighting.Restore()
-        UpdateTray()
     }
-    Log("Off mode ended; display-on-request=" restoreDisplay "; input restored; lighting release requested. Lock has not been requested by recovery yet.")
+    if !restoreDisplay {
+        DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000000, "uint")
+        UpdateTray()
+        Log("Off mode ended; display left to Windows (external lock); input restored; lighting release requested.")
+        return
+    }
+    Log("Wake: input restored; lighting release requested; screens stay dark until lighting is done.")
+    wakeFinishStarted := A_TickCount
+    if synchronous {
+        while !FinishWakeDisplay()
+            Sleep(100)
+    } else
+        SetTimer(FinishWakeDisplay, 100)
+}
+
+; Returns true when finished. Waits for the lighting workers (and their apps) to release,
+; at most 20 s, then removes the covers and sends Windows display-on.
+FinishWakeDisplay() {
+    status := IsObject(lighting) ? lighting.RestoreStatus() : "restored"
+    if status = "pending" && A_TickCount-wakeFinishStarted < 20000
+        return false
+    SetTimer(FinishWakeDisplay, 0)
+    Critical("On")
+    try HideCurtains()
+    try SetDisplayPower(-1)
+    DllCall("Kernel32\SetThreadExecutionState", "uint", 0x2, "uint")
+    DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000000, "uint")
+    Critical("Off")
+    UpdateTray()
+    Log("Lighting " (status = "restored" ? "restored" : "finished with " status) " after " (A_TickCount-wakeFinishStarted) " ms; screens requested on.")
+    return true
 }
 
 ApplyConfiguration(cfg) {
@@ -399,7 +441,7 @@ ReloadConfiguration(command,*) {
 }
 
 Cleanup(*) {
-    try Restore()
+    try Restore(true, true)
     DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000000, "uint")
     if powerRegistration
         DllCall("User32\UnregisterPowerSettingNotification", "ptr", powerRegistration)

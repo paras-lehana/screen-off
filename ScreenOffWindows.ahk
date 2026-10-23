@@ -8,8 +8,9 @@
 #Include DesktopUi.ahk
 #Include WakeLock.ahk
 #Include DisplayPresence.ahk
+#Include WindowLayout.ahk
 ; Windows display standby and temporary Aura control; no monitor DDC commands.
-VERSION := "1.12"
+VERSION := "1.13"
 ; Armoury Crate is closed after each lighting change, so wake restarts it (owner, 21 Oct).
 WAKE_LIGHTING_TIMEOUT_MS := 30000
 mode := A_Args.Length ? A_Args[1] : ""
@@ -28,6 +29,10 @@ sessionRegistration := false
 exitAfterWake := false
 screensBefore := Map()
 lightingBusy := false
+standbyRequested := false
+layoutSnapshot := []
+layoutScreens := Map()
+layoutValidUntil := 0
 wakeEarly := false
 wakeFinishStarted := 0
 wakeGate := WakeLockGate(IniRead(settings, "Security", "LockOnWake", "1") = "1",
@@ -124,7 +129,7 @@ SetDisplayPower(state) {
 }
 
 TurnOff(*) {
-    global active, busy, sawOff, unexpectedWakes, preparationCancellation, screensBefore, lightingBusy
+    global active, busy, sawOff, unexpectedWakes, preparationCancellation, screensBefore, lightingBusy, standbyRequested, layoutSnapshot, layoutScreens
     if active || busy || wakeGate.pending
         return
     busy := true
@@ -145,9 +150,13 @@ TurnOff(*) {
             FileAppend("PASS release check, hotkeys, power/session subscriptions and keep-awake request; backend availability not checked; no lighting/display writes or DDC.`n", "*")
             ExitApp(0)
         }
-        ; 1) Screens first: black covers, input block, then Windows display standby.
+        ; 1) Screens look off at once: black covers and input block. The display stays powered
+        ;    while the lighting apps work, because Armoury Crate builds no UI during standby
+        ;    (23 Oct: "control unavailable" and a display wake when it ran after standby).
         Critical("On")
         screensBefore := AttachedScreens()
+        layoutSnapshot := WindowLayout.Capture()
+        layoutScreens := screensBefore.Clone()
         active := true
         sawOff := false
         unexpectedWakes := 0
@@ -156,26 +165,28 @@ TurnOff(*) {
         ShowCurtains()
         RaiseNotice()
         UpdateTray("Off")
-        SetDisplayPower(2)
-        Log("Windows display-off requested for " MonitorGetCount() " display(s): " DescribeScreens(screensBefore) ".")
         Critical("Off")
-        ; 2) Then the lighting systems and their apps (Armoury Crate opens and closes unseen).
+        ; 2) Lighting systems and their apps, hidden behind the covers.
         lightingBusy := true
         try {
             WaitForLightingBeforeStandby(ObjBindMethod(lighting,"Darken"),
                 ObjBindMethod(lighting,"CheckHealth"), IsPreparationCancelled)
         } catch PreparationCancelled {
-            Log("Lighting preparation stopped: wake requested.")
-            return ; the wake path restores lighting, then the screens
+            Log("Lighting preparation stopped by Esc or wake.")
+            return ; that path restores lighting, then lifts the covers
         } catch Error as lightingError {
-            ; Every lighting system failed: nothing else to wait for, bring the screens back.
+            ; The screens still go off; the skipped systems are reported after wake.
             Log("No lighting system could be controlled: " lightingError.Message)
-            Restore()
-            ShowNotice("Lights were not turned off", lightingError.Message)
-            return
         } finally {
             lightingBusy := false
         }
+        if !active
+            return
+        ; 3) Then real display standby.
+        standbyRequested := true
+        SetDisplayPower(2)
+        Log("Windows display-off requested for " MonitorGetCount() " display(s): " DescribeScreens(screensBefore)
+            . "; " layoutSnapshot.Length " window positions saved.")
         SetTimer(CheckLighting, 5000)
         if wakeEarly
             RequestWake()
@@ -230,7 +241,7 @@ DisplayPowerChanged(wParam, lParam, *) {
     displayState := NumGet(lParam, 20, "uint")
     Log("Windows display state=" displayState ".")
     wakeGate.ObserveDisplay(displayState)
-    if active {
+    if active && standbyRequested {
         if displayState = 0
             sawOff := true
         else {
@@ -254,7 +265,7 @@ CheckLighting() {
 }
 
 ReapplyOff() {
-    if active
+    if active && standbyRequested
         SetDisplayPower(2)
 }
 
@@ -292,7 +303,9 @@ PollWake() {
 }
 
 WakeComplete() {
+    global layoutValidUntil
     SetTimer(PollWake,0)
+    layoutValidUntil := A_TickCount + 15*60000
     UpdateTray()
     ; Monitors re-enumerate a few seconds after the signal returns.
     if screensBefore.Count
@@ -305,6 +318,16 @@ WakeComplete() {
         SetTimer((*) => ExitApp(),-10)
 }
 
+; Puts windows back where they were before standby (only within 15 minutes of the wake).
+RestoreLayout(reason) {
+    if !layoutSnapshot.Length || A_TickCount >= layoutValidUntil
+        return
+    if MissingScreens(layoutScreens, AttachedScreens()).Length
+        return
+    moved := WindowLayout.Restore(layoutSnapshot)
+    Log("Window layout (" reason "): " moved " of " layoutSnapshot.Length " windows moved back.")
+}
+
 ; Windows reports display-on even when a monitor stays dark or disappears.
 CheckScreensReturned() {
     global screensBefore
@@ -313,6 +336,8 @@ CheckScreensReturned() {
     screensBefore := Map()
     if !missing.Length {
         Log("Screens back after wake: " DescribeScreens(now) ".")
+        RestoreLayout("screens back")
+        SetTimer(() => RestoreLayout("settled"), -5000)
         return
     }
     list := ""
@@ -339,6 +364,9 @@ SessionChanged(event, sessionId, *) {
         wakeGate.Confirm()
     } else if event = 8 {
         Log("Windows confirmed session unlocked.")
+        ; Windows can rearrange windows again when the desktop returns after sign-in.
+        if layoutSnapshot.Length && A_TickCount < layoutValidUntil
+            SetTimer(() => RestoreLayout("after sign-in"), -2000)
         UpdateTray()
     }
 }
@@ -366,7 +394,8 @@ EmergencyExit(*) {
 ; Wake order: release input, restore lighting and apps while the screens are still dark
 ; (covers up, display in standby), and only then bring the screens back.
 Restore(restoreDisplay := true, synchronous := false, *) {
-    global active, wakeFinishStarted
+    global active, wakeFinishStarted, standbyRequested
+    standbyRequested := false
     HideNotice() ; Never show a stale "turning off" message after wake/cancel.
     if !active {
         if IsObject(lighting)
@@ -394,7 +423,11 @@ Restore(restoreDisplay := true, synchronous := false, *) {
         Log("Off mode ended; display left to Windows (external lock); input restored; lighting release requested.")
         return
     }
-    Log("Wake: input restored; lighting release requested; screens stay dark until lighting is done.")
+    ; Power the display behind the black covers so Armoury Crate can restore its effect;
+    ; the covers lift only after every lighting system has released.
+    try SetDisplayPower(-1)
+    DllCall("Kernel32\SetThreadExecutionState", "uint", 0x2, "uint")
+    Log("Wake: input restored; display on behind covers; lighting release requested.")
     wakeFinishStarted := A_TickCount
     if synchronous {
         while !FinishWakeDisplay()
@@ -404,7 +437,7 @@ Restore(restoreDisplay := true, synchronous := false, *) {
 }
 
 ; Returns true when finished. Waits for the lighting workers (and their apps) to release,
-; at most 20 s, then removes the covers and sends Windows display-on.
+; at most 20 s, then lifts the covers (display-on is requested again in case it slept).
 FinishWakeDisplay() {
     status := IsObject(lighting) ? lighting.RestoreStatus() : "restored"
     if status = "pending" && A_TickCount-wakeFinishStarted < 20000
@@ -417,7 +450,7 @@ FinishWakeDisplay() {
     DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000000, "uint")
     Critical("Off")
     UpdateTray()
-    Log("Lighting " (status = "restored" ? "restored" : "finished with " status) " after " (A_TickCount-wakeFinishStarted) " ms; screens requested on.")
+    Log("Lighting " (status = "restored" ? "restored" : "finished with " status) " after " (A_TickCount-wakeFinishStarted) " ms; covers lifted.")
     return true
 }
 

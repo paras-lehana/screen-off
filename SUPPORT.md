@@ -15,7 +15,7 @@ Status key:
 | Monitor | Connection | Status | Notes |
 |---|---|---|---|
 | Samsung Odyssey G7 32" (LC32G7xT / C32G75T) | DisplayPort 1.4, 2560x1440 240 Hz | **Verified** (v1.9–1.10) | Sleeps and wakes with both monitors. It reconnects on DisplayPort after each wake, which Screen Off checks. **Never send it DDC power-off (VCP D6 04/05)**: it stays off and unreachable over DisplayPort; see [recovery](recovery/README.md). |
-| Samsung C27JG5x (C27JG50) | DisplayPort 1.2 / HDMI | **Verified** (v1.9) | |
+| Samsung C27JG5x (C27JG50) | DisplayPort 1.2 / HDMI | **Verified** (v1.9) | On DisplayPort both monitors disconnect while asleep; since v1.13 window positions are restored after wake. |
 | Any monitor that sleeps when the signal stops | any | Expected | Screen Off only uses Windows standby, the same as Windows' own display timeout. |
 
 ## Lighting
@@ -25,7 +25,7 @@ Status key:
 | ASUS motherboard, ASUS GPU, desktop strips | ASUS Aura, *profile* method (Armoury Crate) | **Verified** (v1.8–1.10) | All dark during standby and the configured effect returns on wake. Devices must be in Armoury Crate's *Sync devices*. |
 | RAM synced in Armoury Crate | ASUS Aura, *profile* method | **Verified** (v1.8) | Previously excluded "Desktop" sync entry had to be included. |
 | Same devices | ASUS Aura, *SDK* method | **Partial** | GPU and strips went dark; RAM stayed lit in testing. |
-| Armoury Crate window | ASUS Aura, *profile* method | **Implemented** (v1.12) | Screens go dark before it opens, it is closed after each change, and on wake the screens return only after it has closed. Owner confirmation pending. |
+| Armoury Crate window | ASUS Aura, *profile* method | **Implemented** (v1.13) | Works behind black covers with the display powered (it builds no UI during standby: v1.12 failed). Closed after each change. Owner confirmation pending. |
 | Third-party case fans on the ASUS ARGB header | ASUS Aura | **Partial** | A faint glow was seen with the SDK method; dark with the profile method when synced. |
 | Corsair K100 RGB (USB PID 1BC5) | Corsair iCUE SDK (4.0.48 for iCUE 4, 4.0.84 for iCUE 5) | **Verified** (v1.11, iCUE 4.33.138) | Needs iCUE Settings > Software and Games > Software Integrations on (it was already on here) and a local session: over Remote Desktop iCUE lists no devices. Exclusive lighting control, black every 2 s, released so iCUE restores its profile. All 173 LEDs (keys, lightbar, wheel) went dark for the 12 s test and iCUE's own lighting returned on release. A full off/wake cycle with the screens is still to be confirmed. |
 | Other Corsair devices (mice, headsets, pads, coolers, RAM) | Corsair iCUE SDK | **Implemented** | Choose device types in Settings. iCUE's own mirrors of other brands' motherboards/GPUs are never requested. |

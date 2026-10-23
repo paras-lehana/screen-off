@@ -29,6 +29,7 @@ Invoke-AhkCheck 'test-input-release.ahk'
 Invoke-AhkCheck 'test-standby-preparation.ahk'
 Invoke-AhkCheck 'test-display-presence.ahk'
 Invoke-AhkCheck 'test-lighting-set.ahk'
+Invoke-AhkCheck 'test-window-layout.ahk'
 Get-ChildItem -LiteralPath $PSScriptRoot -Filter '*.ps1' -File | ForEach-Object {
     $tokens = $null; $parseErrors = $null
     $null = [System.Management.Automation.Language.Parser]::ParseFile($_.FullName,[ref]$tokens,[ref]$parseErrors)

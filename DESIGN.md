@@ -1,5 +1,11 @@
 # Screen Off desktop UI
 
+## Version 1.13
+
+Covers give the instant "screens off" look; true standby waits until the lighting apps are done,
+because Armoury Crate cannot work during standby. Wake mirrors it: display on behind covers,
+lights restored, covers lifted. Window positions are saved and restored around standby.
+
 ## Version 1.12
 
 User experience order: off = screens first, then lights and apps unseen; wake = lights and apps

@@ -10,17 +10,19 @@ the room goes dark, the PC keeps working, and a stray mouse bump does not wake t
 
 ## What it does
 
-- **Ctrl+Alt+F12** (configurable): the screens go dark first (black covers, then Windows standby),
-  and only then are the lighting systems and their apps switched off, out of sight. The PC stays awake.
+- **Ctrl+Alt+F12** (configurable): black covers make the screens look off at once; the lighting
+  systems and their apps are switched off behind them (Armoury Crate needs a powered display), then
+  Windows puts the monitors into standby. The PC stays awake.
 - **Space** (configurable), press and release: input is freed and lighting is restored *while the
-  screens are still dark*; only when that is done do the screens come back. Windows then locks if
+  screens still show black*; only when that is done do the covers lift. Windows then locks if
   you enabled "Require Windows sign-in after recovery".
 - Apps the utility opens (Armoury Crate) are closed again after every change, so nothing is left on
   screen. iCUE keeps running in the tray, as the Corsair SDK needs it.
 - While dark, mouse movement, clicks and other keys are ignored, so they do not wake the screens.
   **Esc** is the only cancel: while the lights are still switching off it restores everything.
 - **Ctrl+Alt+Esc**: restore everything and exit.
-- After wake it checks every monitor came back and tells you if one did not.
+- After wake it checks every monitor came back and tells you if one did not, and puts windows back
+  on the screen they were on (DisplayPort monitors disconnect while asleep and Windows moves them).
 - A tray icon shows the state, keys and the lighting systems in use; double-click for Settings.
 
 Screens are switched off only through **Windows display standby** (the monitor sleeps because the
@@ -116,7 +118,7 @@ Physical behaviour still needs a person watching the hardware; please report it 
 
 ## Status
 
-Version 1.12. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
+Version 1.13. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
 for what has been confirmed on real hardware and what is only implemented.
 
 ## License

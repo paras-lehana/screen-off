@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.13 — 23 October 2026
+- Fixed: ASUS lighting stayed on in 1.12. Armoury Crate builds no UI while displays are in standby,
+  so the Dark effect could not be selected and its launch woke the displays (grey flash, monitor
+  source banner). Now black covers go up at once (the screens look off), lighting and apps are
+  handled behind them with the display still powered, and only then does real standby start. On
+  wake the display powers up behind the covers, lighting is restored, then the covers lift.
+- New: window positions are saved before standby and put back after the screens return (and again
+  after sign-in). DisplayPort monitors disconnect while asleep and Windows moves their windows to
+  the remaining screen. Only moved windows are touched; maximized windows return maximized.
+- If every lighting system fails, the screens still go off; the problem is reported after wake.
+
 ## 1.12 â€” 23 October 2026
 - Turning off now starts with the screens (covers, input block, Windows standby); lighting and its
   apps are switched off afterwards, out of sight. Pressing the wake key during that step stops it.

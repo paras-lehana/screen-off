@@ -2,7 +2,8 @@ param(
     [Parameter(Mandatory=$true)][int]$ParentId,
     [Parameter(Mandatory=$true)][string]$StatePrefix,
     [ValidateSet('breathing','rainbow','colorcycle','static','dark')][string]$WakeEffect = 'breathing',
-    [ValidateSet(0,1)][int]$RestorePrevious = 0
+    [ValidateSet(0,1)][int]$RestorePrevious = 0,
+    [switch]$RestoreOnly
 )
 # Native Windows UI Automation, not private ASUS interfaces or screen coordinates.
 # These names/IDs belong to the installed Armoury Crate UI. Change here if ASUS
@@ -14,13 +15,17 @@ $AURA_TAB_NAME = 'Aura Effects'
 $AURA_DARK_ID = 'DarkBtn'
 $AURA_EFFECT_IDS = @{ breathing='BreathBtn'; rainbow='RainbowBtn'; colorcycle='ColorCycleBtn'; static='StaticBtn'; dark='DarkBtn' }
 $AURA_KNOWN_EFFECT_IDS = @('StaticBtn','BreathBtn','StrobingBtn','ColorCycleBtn','RainbowBtn','StarryNightBtn','NewMusicBtn','SmartBtn','ScreenExtensionBtn','ImmersionBtn','AILightingBtn','DarkBtn')
-$AURA_UI_TIMEOUT_MS = 12000
+# A cold start after hours closed can take 20+ s (23 Oct: a 12 s limit left the lights dark).
+$AURA_UI_TIMEOUT_MS = 40000
 $AURA_UI_POLL_MS = 150
 # Owner 21 Oct: close Armoury Crate after every off/on change, so it is never left on
 # screen. $false restores the earlier behavior (re-minimize only if it was minimized).
 $AURA_CLOSE_AFTER_ACTION = $true
 # Pause between selecting an effect and closing the window, so the app hands it to the service.
 $AURA_SETTLE_MS = 1500
+# Keep the Armoury Crate window open after selecting Dark (hidden behind the screen covers) and
+# close it as the last step of the restore. Closing it first made the wake-time relaunch slow.
+$AURA_CLOSE_AFTER_DARK = $false
 $AURA_CLOSE_TIMEOUT_MS = 5000
 $OWNER_POLL_MS = 250
 $ErrorActionPreference = 'Stop'
@@ -60,6 +65,7 @@ function Select-Element($Element) {
     if(-not $selection.Current.IsSelected) { throw ('Armoury Crate did not select '+$Element.Current.Name) }
 }
 function Open-Effects {
+    Write-Log ('Open-Effects start (restoring=' + $script:restoring + ')')
     $condition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,$AURA_WINDOW_NAME)
     $script:window=[System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Children,$condition)
     if($null -eq $script:window) {
@@ -73,7 +79,8 @@ function Open-Effects {
             $script:window=[System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Children,$condition)
         } while($null -eq $script:window -and $watch.ElapsedMilliseconds -lt $AURA_UI_TIMEOUT_MS)
         if($null -eq $script:window) { throw 'Armoury Crate did not open.' }
-    }
+        Write-Log ('Armoury Crate window appeared after ' + $watch.ElapsedMilliseconds + ' ms')
+    } else { Write-Log 'Armoury Crate window already open' }
     # A minimized UWP window exposes zero descendants. Restore it for UIA; afterwards
     # Finish-UiAction closes it (or re-minimizes it when closing is turned off).
     $windowPattern=$script:window.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern)
@@ -82,11 +89,14 @@ function Open-Effects {
         $windowPattern.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Normal)
     }
     Select-Element (Wait-Element $script:window $AURA_NAV_NAME)
+    Write-Log 'Lighting & Aura Sync selected'
     Select-Element (Wait-Element $script:window $AURA_TAB_NAME)
+    Write-Log 'Aura Effects selected'
     $null=Wait-Element $script:window $AURA_DARK_ID -Id
 }
-function Finish-UiAction {
+function Finish-UiAction([switch]$KeepOpen) {
     try {
+        if($KeepOpen) { Write-Log 'Armoury Crate window left open (hidden behind the covers) until restore'; return }
         if($null -eq $script:window) { return }
         $windowPattern=$script:window.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern)
         if($AURA_CLOSE_AFTER_ACTION) {
@@ -113,6 +123,13 @@ try {
     $null=$parentProcess.Handle
     Add-Type -AssemblyName UIAutomationClient
     Add-Type -AssemblyName UIAutomationTypes
+    if($RestoreOnly) {
+        $restoring=$true
+        Open-Effects
+        Select-Element (Wait-Element $window $restoreId -Id)
+        Write-Log ('Restored lighting effect ' + $restoreId + ' (restore-only run)')
+        return
+    }
     Open-Effects
     if($RestorePrevious) {
         foreach($candidate in $AURA_KNOWN_EFFECT_IDS) {
@@ -128,7 +145,7 @@ try {
     Check-Cancelled
     $changed=$true
     Select-Element (Wait-Element $window $AURA_DARK_ID -Id)
-    Finish-UiAction
+    Finish-UiAction -KeepOpen:(-not $AURA_CLOSE_AFTER_DARK)
     Write-Log ('Selected Dark (Off); restore target='+$restoreId+'; UI selection is not physical LED confirmation.')
     Set-Status 'APPLIED|Aura Sync Dark (Off) selected through Windows UI Automation'
     while(-not (Test-Path -LiteralPath ($StatePrefix+'.stop'))) {
@@ -145,6 +162,7 @@ try {
             Open-Effects
             Select-Element (Wait-Element $window $restoreId -Id)
             Write-Log ('Restored lighting effect '+$restoreId)
+            $script:window = $script:window
         } catch {
             $failure='Aura profile restoration failed: '+$_.Exception.Message
         }

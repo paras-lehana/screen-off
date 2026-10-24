@@ -10,9 +10,9 @@
 #Include DisplayPresence.ahk
 #Include WindowLayout.ahk
 ; Windows display standby and temporary Aura control; no monitor DDC commands.
-VERSION := "1.13"
+VERSION := "1.14"
 ; Armoury Crate is closed after each lighting change, so wake restarts it (owner, 21 Oct).
-WAKE_LIGHTING_TIMEOUT_MS := 30000
+WAKE_LIGHTING_TIMEOUT_MS := 75000
 mode := A_Args.Length ? A_Args[1] : ""
 settings := A_ScriptDir "\settings.ini"
 offHotkey := IniRead(settings, "Keys", "OffHotkey", "^!F12")
@@ -437,10 +437,10 @@ Restore(restoreDisplay := true, synchronous := false, *) {
 }
 
 ; Returns true when finished. Waits for the lighting workers (and their apps) to release,
-; at most 20 s, then lifts the covers (display-on is requested again in case it slept).
+; at most 65 s, then lifts the covers (display-on is requested again in case it slept).
 FinishWakeDisplay() {
     status := IsObject(lighting) ? lighting.RestoreStatus() : "restored"
-    if status = "pending" && A_TickCount-wakeFinishStarted < 20000
+    if status = "pending" && A_TickCount-wakeFinishStarted < 65000
         return false
     SetTimer(FinishWakeDisplay, 0)
     Critical("On")

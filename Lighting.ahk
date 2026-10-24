@@ -81,9 +81,9 @@ class LightingController {
         if ProcessExist(this.workerPid) {
             ; A vendor call that never returns must not keep devices dark: ending the
             ; process makes the vendor service drop its control and restore lighting.
-            if this.HasOwnProp("restoreRequested") && A_TickCount-this.restoreRequested > 12000 {
+            if this.HasOwnProp("restoreRequested") && A_TickCount-this.restoreRequested > 60000 {
                 ProcessClose(this.workerPid)
-                return "ERROR|" this.label " worker did not release within 12 s and was ended; its service restores lighting."
+                return "ERROR|" this.label " worker did not release within 60 s and was ended; its service restores lighting."
             }
             return "pending"
         }

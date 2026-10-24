@@ -16,8 +16,8 @@ the room goes dark, the PC keeps working, and a stray mouse bump does not wake t
 - **Space** (configurable), press and release: input is freed and lighting is restored *while the
   screens still show black*; only when that is done do the covers lift. Windows then locks if
   you enabled "Require Windows sign-in after recovery".
-- Apps the utility opens (Armoury Crate) are closed again after every change, so nothing is left on
-  screen. iCUE keeps running in the tray, as the Corsair SDK needs it.
+- Armoury Crate is closed at the end of every restore, so nothing is left on screen (during the off
+  period it stays open, hidden behind the covers, which keeps the wake-time restore fast). iCUE keeps running in the tray, as the Corsair SDK needs it.
 - While dark, mouse movement, clicks and other keys are ignored, so they do not wake the screens.
   **Esc** is the only cancel: while the lights are still switching off it restores everything.
 - **Ctrl+Alt+Esc**: restore everything and exit.
@@ -101,9 +101,9 @@ Windows sometimes wakes the display on its own; the utility puts it back to stan
 flash is possible.
 
 On wake it releases input and tells every worker to restore while the covers and standby stay in
-place. Once every worker has released (at most 20 s), it removes the covers and asks Windows for
+place. Once every worker has released (normally a few seconds, at most about a minute), it removes the covers and asks Windows for
 the display. It locks the session only after Windows confirms the display is on and every worker
-has released its devices. A worker that does not exit within 12 s is ended, which makes its vendor
+has released its devices. A worker that does not exit within 60 s is ended, which makes its vendor
 service restore lighting.
 
 Workers write `logs\rgb-*.log` and `.status` files; the tray menu opens them.
@@ -118,7 +118,7 @@ Physical behaviour still needs a person watching the hardware; please report it 
 
 ## Status
 
-Version 1.13. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
+Version 1.14. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
 for what has been confirmed on real hardware and what is only implemented.
 
 ## License

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.14 — 24 October 2026
+- Fixed: after a long sleep the ASUS lights were never restored and Armoury Crate stayed open. The
+  worker closed Armoury Crate right after selecting Dark; relaunching it from cold took ~11 s (its
+  navigation alone needs ~6 s) and the 12 s limit ended the restore mid-way, leaving Dark selected.
+- Armoury Crate is now left open (hidden behind the covers) after Dark and closed as the last step of
+  the restore. Cold-start allowances are generous (window 40 s, supervisor 60 s, screens wait up to
+  65 s) and every step is logged. New `-RestoreOnly` worker mode restores the effect on its own.
+
 ## 1.13 — 23 October 2026
 - Fixed: ASUS lighting stayed on in 1.12. Armoury Crate builds no UI while displays are in standby,
   so the Dark effect could not be selected and its launch woke the displays (grey flash, monitor

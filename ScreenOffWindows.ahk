@@ -10,7 +10,7 @@
 #Include DisplayPresence.ahk
 #Include WindowLayout.ahk
 ; Windows display standby and temporary Aura control; no monitor DDC commands.
-VERSION := "1.14"
+VERSION := "1.15"
 ; Armoury Crate is closed after each lighting change, so wake restarts it (owner, 21 Oct).
 WAKE_LIGHTING_TIMEOUT_MS := 75000
 mode := A_Args.Length ? A_Args[1] : ""
@@ -29,6 +29,8 @@ sessionRegistration := false
 exitAfterWake := false
 screensBefore := Map()
 lightingBusy := false
+coversLifted := true
+lightingWatch := 0
 standbyRequested := false
 layoutSnapshot := []
 layoutScreens := Map()
@@ -298,8 +300,9 @@ LockCurrentSession() {
     return !!DllCall("User32\LockWorkStation", "int")
 }
 
+; Locking waits for the covers to lift (display confirmed on), not for the lighting apps.
 PollWake() {
-    wakeGate.Poll(A_TickCount,lighting.RestoreStatus())
+    wakeGate.Poll(A_TickCount, coversLifted ? "restored" : "pending")
 }
 
 WakeComplete() {
@@ -394,7 +397,7 @@ EmergencyExit(*) {
 ; Wake order: release input, restore lighting and apps while the screens are still dark
 ; (covers up, display in standby), and only then bring the screens back.
 Restore(restoreDisplay := true, synchronous := false, *) {
-    global active, wakeFinishStarted, standbyRequested
+    global active, wakeFinishStarted, standbyRequested, coversLifted
     standbyRequested := false
     HideNotice() ; Never show a stale "turning off" message after wake/cancel.
     if !active {
@@ -427,31 +430,51 @@ Restore(restoreDisplay := true, synchronous := false, *) {
     ; the covers lift only after every lighting system has released.
     try SetDisplayPower(-1)
     DllCall("Kernel32\SetThreadExecutionState", "uint", 0x2, "uint")
-    Log("Wake: input restored; display on behind covers; lighting release requested.")
+    Log("Wake: input restored; display on behind covers; lighting release requested (runs in the background).")
+    coversLifted := false
     wakeFinishStarted := A_TickCount
     if synchronous {
-        while !FinishWakeDisplay()
+        while !FinishWakeDisplay(true)
             Sleep(100)
     } else
         SetTimer(FinishWakeDisplay, 100)
 }
 
-; Returns true when finished. Waits for the lighting workers (and their apps) to release,
-; at most 65 s, then lifts the covers (display-on is requested again in case it slept).
-FinishWakeDisplay() {
+; Returns true when finished. The lighting restore runs in the background: the covers lift as soon
+; as no lighting app window can appear (Armoury Crate is parked off-screen), normally within a
+; second; only emergency exit/shutdown (synchronous) waits for the restore to complete.
+FinishWakeDisplay(synchronous := false) {
+    global coversLifted
     status := IsObject(lighting) ? lighting.RestoreStatus() : "restored"
-    if status = "pending" && A_TickCount-wakeFinishStarted < 65000
+    ready := synchronous ? status != "pending" : (IsObject(lighting) ? lighting.AllHidden() : true)
+    if !ready && A_TickCount-wakeFinishStarted < 65000
         return false
     SetTimer(FinishWakeDisplay, 0)
     Critical("On")
+    coversLifted := true
     try HideCurtains()
     try SetDisplayPower(-1)
     DllCall("Kernel32\SetThreadExecutionState", "uint", 0x2, "uint")
     DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000000, "uint")
     Critical("Off")
     UpdateTray()
-    Log("Lighting " (status = "restored" ? "restored" : "finished with " status) " after " (A_TickCount-wakeFinishStarted) " ms; covers lifted.")
+    Log("Covers lifted after " (A_TickCount-wakeFinishStarted) " ms; lighting " (status = "pending" ? "still restoring in the background" : status = "restored" ? "restored" : "finished with " status) ".")
+    if status = "pending" && !synchronous
+        SetTimer(WatchLightingRestore, 500)
     return true
+}
+
+; Reports a lighting problem that only shows up after the screens are already back.
+WatchLightingRestore() {
+    status := lighting.RestoreStatus()
+    if status = "pending"
+        return
+    SetTimer(WatchLightingRestore, 0)
+    Log("Background lighting restore finished: " status)
+    if SubStr(status, 1, 6) = "ERROR|" {
+        UpdateTray("Check lights")
+        ShowNotice("Lights were not fully restored", SubStr(status, 7), 20000)
+    }
 }
 
 ApplyConfiguration(cfg) {

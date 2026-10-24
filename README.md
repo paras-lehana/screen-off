@@ -13,8 +13,9 @@ the room goes dark, the PC keeps working, and a stray mouse bump does not wake t
 - **Ctrl+Alt+F12** (configurable): black covers make the screens look off at once; the lighting
   systems and their apps are switched off behind them (Armoury Crate needs a powered display), then
   Windows puts the monitors into standby. The PC stays awake.
-- **Space** (configurable), press and release: input is freed and lighting is restored *while the
-  screens still show black*; only when that is done do the covers lift. Windows then locks if
+- **Space** (configurable), press and release: input is freed, the lighting restore starts in the
+  background and the screens come back right away (normally under a second); Armoury Crate's
+  window is parked off-screen while it works and closed when done. Windows then locks if
   you enabled "Require Windows sign-in after recovery".
 - Armoury Crate is closed at the end of every restore, so nothing is left on screen (during the off
   period it stays open, hidden behind the covers, which keeps the wake-time restore fast). iCUE keeps running in the tray, as the Corsair SDK needs it.
@@ -100,10 +101,10 @@ until the wake key is released.
 Windows sometimes wakes the display on its own; the utility puts it back to standby, so a brief
 flash is possible.
 
-On wake it releases input and tells every worker to restore while the covers and standby stay in
-place. Once every worker has released (normally a few seconds, at most about a minute), it removes the covers and asks Windows for
-the display. It locks the session only after Windows confirms the display is on and every worker
-has released its devices. A worker that does not exit within 60 s is ended, which makes its vendor
+On wake it releases input, powers the display on behind the covers and tells every worker to restore.
+The covers lift as soon as no lighting app window can appear (the Armoury Crate worker parks its
+window off-screen and signals it); the restore finishes in the background and any problem is
+reported afterwards. It locks the session once Windows confirms the display is on. A worker that does not exit within 60 s is ended, which makes its vendor
 service restore lighting.
 
 Workers write `logs\rgb-*.log` and `.status` files; the tray menu opens them.
@@ -118,7 +119,7 @@ Physical behaviour still needs a person watching the hardware; please report it 
 
 ## Status
 
-Version 1.14. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
+Version 1.15. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
 for what has been confirmed on real hardware and what is only implemented.
 
 ## License

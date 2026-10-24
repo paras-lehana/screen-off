@@ -20,6 +20,8 @@ class FakeController {
     }
     Restore() => this.restored := true
     RestoreStatus() => this.status
+    hiddenSignal := true
+    Hidden() => this.hiddenSignal
     CheckHealth() => this.health
 }
 Check(ok, label) {
@@ -79,6 +81,15 @@ try {
     lights := SetOf(FakeController("Aura"), FakeController("Corsair","fail","pending"))
     lights.Darken()
     Check(lights.RestoreStatus()="restored", "A skipped system is not awaited")
+    ; Screens may return while lighting still works, but only once nothing can show on screen.
+    quiet := FakeController("Corsair"), windowed := FakeController("Aura","ok","pending")
+    windowed.hiddenSignal := false
+    lights := SetOf(quiet, windowed)
+    lights.Darken()
+    Check(!lights.AllHidden(), "A system with a visible app window keeps the covers up")
+    windowed.hiddenSignal := true
+    Check(lights.AllHidden() && lights.RestoreStatus()="pending", "Covers may lift while the restore is still running")
+    Check(SetOf().AllHidden(), "Display-only set has nothing to hide")
     FileAppend("PASS " checks " lighting-set checks; fake controllers only.`n", "*")
 } catch Error as testError {
     FileAppend("FAIL " testError.Message "`n", "**")

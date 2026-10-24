@@ -35,6 +35,21 @@ $restoring = $false
 $window = $null
 $failure = $null
 $restoreId = $AURA_EFFECT_IDS[$WakeEffect]
+Add-Type -Namespace ScreenOff -Name Win32 -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);'
+# The lighting step runs in the background while the screens come back, so the Armoury Crate
+# window is parked far off-screen as soon as it exists and signalled with <prefix>.hidden.
+function Write-Hidden { try { [IO.File]::WriteAllText($StatePrefix+'.hidden','1',$encoding) } catch { } }
+function Hide-Window {
+    try {
+        $h=[IntPtr]$script:window.Current.NativeWindowHandle
+        if($h -ne [IntPtr]::Zero) {
+            # SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
+            [void][ScreenOff.Win32]::SetWindowPos($h,[IntPtr]::Zero,-32000,-32000,0,0,0x15)
+            Write-Log 'Armoury Crate window moved off-screen'
+        }
+    } catch { Write-Log ('Hide-window warning: '+$_.Exception.Message) }
+    Write-Hidden
+}
 $parentProcess = $null
 $minimizeAfterAction = $false
 function Set-Status([string]$Value) { [IO.File]::WriteAllText($StatePrefix+'.status',$Value,$encoding) }
@@ -88,6 +103,7 @@ function Open-Effects {
         $script:minimizeAfterAction=$true
         $windowPattern.SetWindowVisualState([System.Windows.Automation.WindowVisualState]::Normal)
     }
+    Hide-Window
     Select-Element (Wait-Element $script:window $AURA_NAV_NAME)
     Write-Log 'Lighting & Aura Sync selected'
     Select-Element (Wait-Element $script:window $AURA_TAB_NAME)
@@ -168,6 +184,7 @@ try {
         }
     }
     Finish-UiAction
+    Write-Hidden
     if($null -ne $failure) { Set-Status ('ERROR|'+$failure) } else { Set-Status 'RESTORED|Aura lighting effect selected' }
 }
 if($null -ne $failure) { exit 1 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.15 — 24 October 2026
+- Waking no longer waits for the lighting restore. The restore is fired first and runs in the
+  background; the screens come back as soon as no lighting app window can show (normally under a
+  second). The Armoury Crate window is moved far off-screen the moment it exists and closed at the
+  end of the restore. A problem found afterwards is reported in a notice and the tray.
+- Windows locks as soon as the screens are back, instead of after the lighting finished.
+- Turning off is unchanged: covers and the input block make the screens look off at once, the
+  lighting work happens behind them, and real display standby follows (Armoury Crate cannot work
+  during standby).
+- Live test: window parked at -32000,-32000 from 38 ms after it appears; restore 2.1 s, window closed.
+
 ## 1.14 — 24 October 2026
 - Fixed: after a long sleep the ASUS lights were never restored and Armoury Crate stayed open. The
   worker closed Armoury Crate right after selecting Dark; relaunching it from cold took ~11 s (its

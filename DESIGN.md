@@ -1,5 +1,9 @@
 # Screen Off desktop UI
 
+## Version 1.15
+
+Wake is asynchronous: lights restore in the background, covers lift when no app window can show.
+
 ## Version 1.13
 
 Covers give the instant "screens off" look; true standby waits until the lighting apps are done,

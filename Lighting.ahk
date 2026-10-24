@@ -67,8 +67,18 @@ class LightingController {
         try status := FileRead(this.prefix ".status", "UTF-8")
         return status
     }
+    ; True once the system has nothing that could appear on screen: no app window (non-UI
+    ; systems), or the worker parked/closed it (<prefix>.hidden), or the worker is gone.
+    Hidden() {
+        if !this.workerPid || !ProcessExist(this.workerPid)
+            return true
+        if this.kind != "aura" || this.cfg.auraMethod != "profile"
+            return true
+        return FileExist(this.prefix ".hidden") != ""
+    }
     Restore() {
         if this.prefix != "" && !FileExist(this.prefix ".stop") {
+            try FileDelete(this.prefix ".hidden") ; the restore re-signals once the window is safe
             FileAppend("release", this.prefix ".stop", "UTF-8")
             this.restoreRequested := A_TickCount
         }
@@ -151,6 +161,12 @@ class LightingSet {
     Restore() {
         for controller in this.controllers
             controller.Restore()
+    }
+    AllHidden() {
+        for controller in this.controllers
+            if !controller.Hidden()
+                return false
+        return true
     }
     ; Every system that was started counts, including one interrupted before it finished
     ; turning lights off: the screens must not return while its app is still busy.

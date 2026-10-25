@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.16 — 25 October 2026
+- Fixed: maximized windows (all VS Code windows) were not put back on their screen. Windows keeps a
+  maximized window's restored rectangle when it moves it to the other monitor, so the old
+  "did it move?" check, which compared that rectangle only, saw no change. The monitor each window is
+  on is now saved and compared, and a maximized window is restored onto its monitor and re-maximized.
+- Reproduced with a live test: a maximized window pushed onto the primary screen the way Windows
+  does it was reported "not moved" by the old check and is now returned to the secondary screen.
+
 ## 1.15 — 24 October 2026
 - Waking no longer waits for the lighting restore. The restore is fired first and runs in the
   background; the screens come back as soon as no lighting app window can show (normally under a

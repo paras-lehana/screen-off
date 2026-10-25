@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.17 — 26 October 2026
+- Fixed: the utility could die during a blackout and leave the screens on. While the monitors flapped
+  (repeated sleep/wake) the display-standby request timed out; that timeout was treated as fatal, the
+  error handler restored everything (screens on, Armoury Crate launched) and exited.
+- Display power requests now never throw: our own window is tried first (no dependence on the
+  shell), then the shell window, with a 1.5 s limit; a failure is retried every 2 s.
+- After startup an unexpected error is logged (with line number) and the utility keeps running in
+  its current state instead of exiting and changing the display state.
+
 ## 1.16 — 25 October 2026
 - Fixed: maximized windows (all VS Code windows) were not put back on their screen. Windows keeps a
   maximized window's restored rectangle when it moves it to the other monitor, so the old

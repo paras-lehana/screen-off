@@ -10,7 +10,7 @@
 #Include DisplayPresence.ahk
 #Include WindowLayout.ahk
 ; Windows display standby and temporary Aura control; no monitor DDC commands.
-VERSION := "1.16"
+VERSION := "1.17"
 ; Armoury Crate is closed after each lighting change, so wake restarts it (owner, 21 Oct).
 WAKE_LIGHTING_TIMEOUT_MS := 75000
 mode := A_Args.Length ? A_Args[1] : ""
@@ -29,6 +29,7 @@ sessionRegistration := false
 exitAfterWake := false
 screensBefore := Map()
 lightingBusy := false
+residentReady := false
 coversLifted := true
 lightingWatch := 0
 standbyRequested := false
@@ -101,6 +102,7 @@ if mode = "--test-rgb" {
 
 SetupTray()
 Persistent()
+residentReady := true
 Log("Ready v" VERSION ". Windows standby; off=" offHotkey "; wake=" wakeKey ".")
 if mode = "--settings"
     ShowSettings()
@@ -119,15 +121,20 @@ IgnoreInput(*) {
     return
 }
 
-; Send standard Windows standby/on to the desktop with a bounded wait.
+; Send standard Windows standby/on with a bounded wait. Returns false instead of throwing: while
+; monitors flap the shell can stall, and 26 Oct 01:04 a thrown timeout killed the whole utility and
+; left the screens on. Our own window is tried first (DefWindowProc handles SC_MONITORPOWER, no
+; dependence on explorer), then the shell window.
 SetDisplayPower(state) {
-    desktop := DllCall("User32\GetShellWindow", "ptr")
-    if !desktop
-        throw Error("Windows desktop shell is unavailable.")
-    result := 0
-    if !DllCall("User32\SendMessageTimeoutW", "ptr", desktop, "uint", 0x112,
-        "uptr", 0xF170, "ptr", state, "uint", 2, "uint", 1000, "uptr*", &result, "ptr")
-        throw Error("Windows display power request timed out.")
+    for target in [A_ScriptHwnd, DllCall("User32\GetShellWindow", "ptr")] {
+        if !target
+            continue
+        result := 0
+        if DllCall("User32\SendMessageTimeoutW", "ptr", target, "uint", 0x112,
+            "uptr", 0xF170, "ptr", state, "uint", 2, "uint", 1500, "uptr*", &result, "ptr")
+            return true
+    }
+    return false
 }
 
 TurnOff(*) {
@@ -186,7 +193,10 @@ TurnOff(*) {
             return
         ; 3) Then real display standby.
         standbyRequested := true
-        SetDisplayPower(2)
+        if !SetDisplayPower(2) {
+            Log("Display standby request timed out; retrying shortly.")
+            SetTimer(ReapplyOff, -2000)
+        }
         Log("Windows display-off requested for " MonitorGetCount() " display(s): " DescribeScreens(screensBefore)
             . "; " layoutSnapshot.Length " window positions saved.")
         SetTimer(CheckLighting, 5000)
@@ -267,8 +277,12 @@ CheckLighting() {
 }
 
 ReapplyOff() {
-    if active && standbyRequested
-        SetDisplayPower(2)
+    if !(active && standbyRequested)
+        return
+    if !SetDisplayPower(2) {
+        Log("Re-applying display standby timed out; retrying in 2 s.")
+        SetTimer(ReapplyOff, -2000)
+    }
 }
 
 WakeOnRelease(hook, vk, sc) {
@@ -516,14 +530,20 @@ Cleanup(*) {
         DllCall("Wtsapi32\WTSUnRegisterSessionNotification", "ptr", A_ScriptHwnd)
 }
 
+; Startup failures end the utility. Once it is resident, an unexpected error is logged and the
+; utility keeps running in its current state: ending it mid-blackout turned the screens on and
+; left Armoury Crate open (26 Oct 01:04). Esc/the wake key and Ctrl+Alt+Esc still work.
 HandleError(err, *) {
-    try Restore()
-    Log("Error: " err.Message)
-    if mode != ""
-        FileAppend(err.Message "`n", "**")
-    else
-        TrayTip(err.Message, "Screen Off stopped")
-    ExitApp(1)
+    Log("Error: " err.Message " (" err.What " line " err.Line ")")
+    if mode != "" || !residentReady {
+        try Restore(true, true)
+        if mode != ""
+            FileAppend(err.Message "`n", "**")
+        else
+            TrayTip(err.Message, "Screen Off stopped")
+        ExitApp(1)
+    }
+    return 1
 }
 
 Log(message) {

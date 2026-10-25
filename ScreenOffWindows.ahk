@@ -251,7 +251,9 @@ DisplayPowerChanged(wParam, lParam, *) {
         || NumGet(lParam, 16, "uint") < 4
         return
     displayState := NumGet(lParam, 20, "uint")
-    Log("Windows display state=" displayState ".")
+    ; Wake diagnostics: idle(any) counts injected input too, idle(physical) only real devices.
+    ; A small any-idle with a large physical-idle means software woke the display.
+    Log("Windows display state=" displayState "." (displayState != 0 ? " Idle: any input " A_TimeIdle " ms ago, physical " A_TimeIdlePhysical " ms ago." : ""))
     wakeGate.ObserveDisplay(displayState)
     if active && standbyRequested {
         if displayState = 0

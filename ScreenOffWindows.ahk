@@ -10,7 +10,7 @@
 #Include DisplayPresence.ahk
 #Include WindowLayout.ahk
 ; Windows display standby and temporary Aura control; no monitor DDC commands.
-VERSION := "1.17"
+VERSION := "1.18"
 ; Armoury Crate is closed after each lighting change, so wake restarts it (owner, 21 Oct).
 WAKE_LIGHTING_TIMEOUT_MS := 75000
 mode := A_Args.Length ? A_Args[1] : ""
@@ -29,6 +29,7 @@ sessionRegistration := false
 exitAfterWake := false
 screensBefore := Map()
 lightingBusy := false
+sessionLocked := false
 residentReady := false
 coversLifted := true
 lightingWatch := 0
@@ -321,8 +322,20 @@ PollWake() {
     wakeGate.Poll(A_TickCount, coversLifted ? "restored" : "pending")
 }
 
+; Runs the lighting restore that waited for an unlocked desktop. Needs the lock screen gone.
+RestoreLightingAfterUnlock() {
+    if sessionLocked || !lighting.HasDeferred()
+        return
+    count := lighting.RestoreDeferred()
+    Log("Session unlocked: " count " deferred lighting restore(s) started.")
+    SetTimer(WatchLightingRestore, 500)
+}
+
 WakeComplete() {
     global layoutValidUntil
+    ; If Windows did not end up locked (lock failed or was skipped), do not keep Armoury waiting.
+    if !sessionLocked && lighting.HasDeferred()
+        SetTimer(RestoreLightingAfterUnlock, -500)
     SetTimer(PollWake,0)
     layoutValidUntil := A_TickCount + 15*60000
     UpdateTray()
@@ -374,7 +387,9 @@ LockFailed(message) {
 }
 
 SessionChanged(event, sessionId, *) {
+    global sessionLocked
     if event = 7 {
+        sessionLocked := true
         Log("Windows confirmed session locked.")
         CancelPreparation("Windows locked during preparation.", false)
         if active {
@@ -382,7 +397,10 @@ SessionChanged(event, sessionId, *) {
         }
         wakeGate.Confirm()
     } else if event = 8 {
+        sessionLocked := false
         Log("Windows confirmed session unlocked.")
+        if lighting.HasDeferred()
+            SetTimer(RestoreLightingAfterUnlock, -1500)
         ; Windows can rearrange windows again when the desktop returns after sign-in.
         if layoutSnapshot.Length && A_TickCount < layoutValidUntil
             SetTimer(() => RestoreLayout("after sign-in"), -2000)
@@ -428,7 +446,9 @@ Restore(restoreDisplay := true, synchronous := false, *) {
     try {
         keyboard.Stop()
         BlockInput("MouseMoveOff")
-        lighting.Restore()
+        ; Armoury Crate cannot be driven on a locked desktop: hold its restore until sign-in when the
+        ; session is locked or Windows is about to be locked after this wake.
+        lighting.Restore(!synchronous && (sessionLocked || !restoreDisplay || wakeGate.enabled))
         if !restoreDisplay
             HideCurtains() ; external lock: the lock screen is already showing
     } finally {
@@ -439,17 +459,20 @@ Restore(restoreDisplay := true, synchronous := false, *) {
     if !restoreDisplay {
         DllCall("Kernel32\SetThreadExecutionState", "uint", 0x80000000, "uint")
         UpdateTray()
-        Log("Off mode ended; display left to Windows (external lock); input restored; lighting release requested.")
+        Log("Off mode ended; display left to Windows (external lock); input restored; lighting release requested"
+            . (lighting.HasDeferred() ? "; Armoury Crate restore waits for sign-in." : "."))
         return
     }
     ; Power the display behind the black covers so Armoury Crate can restore its effect;
     ; the covers lift only after every lighting system has released.
     try SetDisplayPower(-1)
     DllCall("Kernel32\SetThreadExecutionState", "uint", 0x2, "uint")
-    Log("Wake: input restored; display on behind covers; lighting release requested (runs in the background).")
+    Log("Wake: input restored; display on behind covers; lighting release requested (runs in the background)"
+        . (lighting.HasDeferred() ? "; Armoury Crate restore waits for sign-in." : "."))
     coversLifted := false
     wakeFinishStarted := A_TickCount
     if synchronous {
+        lighting.RestoreDeferred()
         while !FinishWakeDisplay(true)
             Sleep(100)
     } else

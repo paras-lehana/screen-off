@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.18 — 27 October 2026
+- Fixed: ASUS lights stayed on Dark after wake whenever Windows locked the session around the
+  release. Armoury Crate's restore drives its own UI, which Windows does not allow on a locked
+  desktop ("control unavailable"). Windows locks about a second after wake (lock-on-wake) or can lock
+  by itself while the screens are off, so the restore failed in both cases.
+- The Armoury Crate restore is now held while the session is locked or about to lock, and runs
+  about 1.5 s after sign-in. Systems that need no UI (Corsair, OpenRGB, Dynamic Lighting) still
+  restore immediately; if Windows does not end up locked, nothing waits.
+- The Dark step may take up to 45 s (was 20 s): a cold Armoury Crate start needs up to ~15 s.
+- Fixed a missing `global` that kept the lock flag local to the session handler.
+
 ## 1.17 — 26 October 2026
 - Fixed: the utility could die during a blackout and leave the screens on. While the monitors flapped
   (repeated sleep/wake) the display-standby request timed out; that timeout was treated as fatal, the

@@ -102,7 +102,8 @@ Windows sometimes wakes the display on its own; the utility puts it back to stan
 flash is possible.
 
 On wake it releases input, powers the display on behind the covers and tells every worker to restore.
-The covers lift as soon as no lighting app window can appear (the Armoury Crate worker parks its
+Armoury Crate's restore needs an unlocked desktop, so if Windows is locked (or about to lock after the
+wake) it runs right after you sign in. The covers lift as soon as no lighting app window can appear (the Armoury Crate worker parks its
 window off-screen and signals it); the restore finishes in the background and any problem is
 reported afterwards. It locks the session once Windows confirms the display is on. A worker that does not exit within 60 s is ended, which makes its vendor
 service restore lighting.
@@ -119,7 +120,7 @@ Physical behaviour still needs a person watching the hardware; please report it 
 
 ## Status
 
-Version 1.17. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
+Version 1.18. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
 for what has been confirmed on real hardware and what is only implemented.
 
 ## License

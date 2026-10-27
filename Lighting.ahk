@@ -40,7 +40,7 @@ class LightingController {
         pid := 0
         Run(command, A_ScriptDir, "Hide", &pid)
         this.workerPid := pid
-        deadline := A_TickCount+20000
+        deadline := A_TickCount+45000
         Loop {
             if IsObject(isCancelled) && isCancelled.Call() {
                 this.Restore()
@@ -57,7 +57,7 @@ class LightingController {
             }
             if A_TickCount >= deadline {
                 this.Restore()
-                throw Error("preparation exceeded 20 seconds")
+                throw Error("preparation exceeded 45 seconds")
             }
             Sleep(50)
         }
@@ -67,6 +67,10 @@ class LightingController {
         try status := FileRead(this.prefix ".status", "UTF-8")
         return status
     }
+    ; Armoury Crate's restore clicks its own UI, which Windows does not allow on a locked desktop
+    ; (27 Oct: a lock at the moment of release left the ASUS lights on Dark).
+    NeedsUnlockedSession() => this.kind = "aura" && this.cfg.auraMethod = "profile"
+
     ; True once the system has nothing that could appear on screen: no app window (non-UI
     ; systems), or the worker parked/closed it (<prefix>.hidden), or the worker is gone.
     Hidden() {
@@ -123,6 +127,7 @@ class LightingSet {
         this.active := []
         this.skipped := []
         this.skippedControllers := []
+        this.deferred := []
     }
     Describe() => ScreenOffConfig.Describe(this.cfg)
     ; A running worker blocks reconfiguration until it has released its devices.
@@ -158,9 +163,30 @@ class LightingSet {
             text .= (text = "" ? "" : "`n") item
         return text
     }
-    Restore() {
-        for controller in this.controllers
+    ; While the session is locked (or about to be), systems that need an unlocked desktop are held
+    ; until RestoreDeferred(); the others restore at once.
+    Restore(deferUi := false) {
+        for controller in this.controllers {
+            if deferUi && controller.NeedsUnlockedSession() && controller.workerPid && ProcessExist(controller.workerPid) {
+                this.Defer(controller)
+                continue
+            }
             controller.Restore()
+        }
+    }
+    Defer(controller) {
+        for held in this.deferred
+            if held = controller
+                return
+        this.deferred.Push(controller)
+    }
+    HasDeferred() => this.deferred.Length > 0
+    RestoreDeferred() {
+        held := this.deferred
+        this.deferred := []
+        for controller in held
+            controller.Restore()
+        return held.Length
     }
     AllHidden() {
         for controller in this.controllers

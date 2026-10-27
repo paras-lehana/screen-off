@@ -18,10 +18,12 @@ class FakeController {
         if this.mode = "cancel"
             throw PreparationCancelled("cancelled")
     }
-    Restore() => this.restored := true
+    Restore(*) => this.restored := true
     RestoreStatus() => this.status
     hiddenSignal := true
     Hidden() => this.hiddenSignal
+    needsUnlock := false
+    NeedsUnlockedSession() => this.needsUnlock
     CheckHealth() => this.health
 }
 Check(ok, label) {
@@ -90,6 +92,19 @@ try {
     windowed.hiddenSignal := true
     Check(lights.AllHidden() && lights.RestoreStatus()="pending", "Covers may lift while the restore is still running")
     Check(SetOf().AllHidden(), "Display-only set has nothing to hide")
+    ; Armoury Crate cannot be driven on a locked desktop: its restore waits for sign-in, others do not.
+    armoury := FakeController("Aura"), armoury.needsUnlock := true, armoury.workerPid := DllCall("GetCurrentProcessId")
+    keyboard := FakeController("Corsair")
+    lights := SetOf(armoury, keyboard)
+    lights.Darken()
+    lights.Restore(true)
+    Check(keyboard.restored && !armoury.restored && lights.HasDeferred(), "Locked: only the UI-free system restores")
+    Check(lights.RestoreDeferred() = 1 && armoury.restored && !lights.HasDeferred(), "Sign-in releases the deferred restore once")
+    armoury2 := FakeController("Aura"), armoury2.needsUnlock := true, armoury2.workerPid := DllCall("GetCurrentProcessId")
+    lights := SetOf(armoury2, FakeController("Corsair"))
+    lights.Darken()
+    lights.Restore(false)
+    Check(armoury2.restored && !lights.HasDeferred(), "Unlocked session restores everything at once")
     FileAppend("PASS " checks " lighting-set checks; fake controllers only.`n", "*")
 } catch Error as testError {
     FileAppend("FAIL " testError.Message "`n", "**")

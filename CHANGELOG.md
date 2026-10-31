@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.19 — 1 November 2026
+- Fixed: neither the ASUS lights nor the K100 came back after a wake where Windows locked the session.
+  - Armoury Crate: its parked window could be open but empty after a lock (only the title bar was
+    exposed, so "Lighting & Aura Sync" never appeared and the restore failed after 47 s). The worker now
+    detects an empty window within 4 s, closes it and relaunches Armoury Crate.
+  - A failed restore leaves `logs/aura-restore-pending.txt`; Screen Off puts the lights back the next
+    time the desktop is unlocked (and at startup) instead of leaving them on Dark.
+  - Corsair: iCUE drops our control and pauses its SDK the moment Windows locks ("Lightings source is
+    nullptr", "Removing connection"), so releasing during the lock left the K100 on its last black frame.
+    The hand-back now waits for sign-in, black-frame failures during the lock no longer end the worker,
+    and if the session was interrupted the worker reconnects, re-acquires and releases so iCUE re-applies
+    your lighting (new `-Nudge` mode does just the hand-back).
+- Not yet exercised on hardware: written from the 1 Nov logs while the owner slept.
+
 ## 1.18 — 27 October 2026
 - Fixed: ASUS lights stayed on Dark after wake whenever Windows locked the session around the
   release. Armoury Crate's restore drives its own UI, which Windows does not allow on a locked

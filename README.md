@@ -120,7 +120,7 @@ Physical behaviour still needs a person watching the hardware; please report it 
 
 ## Status
 
-Version 1.18. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
+Version 1.19. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)
 for what has been confirmed on real hardware and what is only implemented.
 
 ## License

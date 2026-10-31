@@ -52,6 +52,11 @@ function Hide-Window {
 }
 $parentProcess = $null
 $minimizeAfterAction = $false
+# Written when Dark is selected, removed when the effect is restored. If a restore fails (locked desktop,
+# empty window...) the marker survives, and Screen Off puts the lights back the next time it can.
+$PENDING_FILE = Join-Path (Split-Path $StatePrefix -Parent) 'aura-restore-pending.txt'
+function Set-Pending { try { [IO.File]::WriteAllText($PENDING_FILE, ('restore=' + $restoreId + ' since=' + (Get-Date -Format o)), $encoding) } catch { } }
+function Clear-Pending { try { Remove-Item -LiteralPath $PENDING_FILE -Force -ErrorAction SilentlyContinue } catch { } }
 function Set-Status([string]$Value) { [IO.File]::WriteAllText($StatePrefix+'.status',$Value,$encoding) }
 function Write-Log([string]$Value) {
     try { [IO.File]::AppendAllText($StatePrefix+'.log',(Get-Date -Format o)+' '+$Value+[Environment]::NewLine,$encoding) } catch { }
@@ -79,10 +84,31 @@ function Select-Element($Element) {
     $selection.Select()
     if(-not $selection.Current.IsSelected) { throw ('Armoury Crate did not select '+$Element.Current.Name) }
 }
+# After a lock or a long park the UWP window can stay open with its content dropped (1 Nov: only the title
+# bar was exposed, so "Lighting & Aura Sync" never appeared). Detect that quickly and relaunch.
+function Test-Content([int]$TimeoutMs) {
+    $watch=[Diagnostics.Stopwatch]::StartNew()
+    do {
+        if($null -ne (Find-Element $script:window $AURA_NAV_NAME)) { return $true }
+        Start-Sleep -Milliseconds $AURA_UI_POLL_MS
+    } while($watch.ElapsedMilliseconds -lt $TimeoutMs)
+    return $false
+}
+function Close-Window {
+    try { $script:window.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close() } catch { Write-Log ('Close warning: '+$_.Exception.Message) }
+    $condition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,$AURA_WINDOW_NAME)
+    $watch=[Diagnostics.Stopwatch]::StartNew()
+    while($null -ne [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Children,$condition) -and $watch.ElapsedMilliseconds -lt 8000) { Start-Sleep -Milliseconds $AURA_UI_POLL_MS }
+    $script:window=$null
+}
 function Open-Effects {
     Write-Log ('Open-Effects start (restoring=' + $script:restoring + ')')
     $condition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,$AURA_WINDOW_NAME)
     $script:window=[System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Children,$condition)
+    if($null -ne $script:window -and -not (Test-Content 4000)) {
+        Write-Log 'Armoury Crate window is open but empty (UWP content dropped); closing it to relaunch'
+        Close-Window
+    }
     if($null -eq $script:window) {
         $script:minimizeAfterAction=$true
         # Starts the installed app if closed. It can appear briefly; no coordinate input.
@@ -144,6 +170,7 @@ try {
         Open-Effects
         Select-Element (Wait-Element $window $restoreId -Id)
         Write-Log ('Restored lighting effect ' + $restoreId + ' (restore-only run)')
+        Clear-Pending
         return
     }
     Open-Effects
@@ -161,6 +188,7 @@ try {
     Check-Cancelled
     $changed=$true
     Select-Element (Wait-Element $window $AURA_DARK_ID -Id)
+    Set-Pending
     Finish-UiAction -KeepOpen:(-not $AURA_CLOSE_AFTER_DARK)
     Write-Log ('Selected Dark (Off); restore target='+$restoreId+'; UI selection is not physical LED confirmation.')
     Set-Status 'APPLIED|Aura Sync Dark (Off) selected through Windows UI Automation'
@@ -178,6 +206,7 @@ try {
             Open-Effects
             Select-Element (Wait-Element $window $restoreId -Id)
             Write-Log ('Restored lighting effect '+$restoreId)
+            Clear-Pending
             $script:window = $script:window
         } catch {
             $failure='Aura profile restoration failed: '+$_.Exception.Message

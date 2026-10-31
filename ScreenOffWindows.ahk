@@ -10,7 +10,7 @@
 #Include DisplayPresence.ahk
 #Include WindowLayout.ahk
 ; Windows display standby and temporary Aura control; no monitor DDC commands.
-VERSION := "1.18"
+VERSION := "1.19"
 ; Armoury Crate is closed after each lighting change, so wake restarts it (owner, 21 Oct).
 WAKE_LIGHTING_TIMEOUT_MS := 75000
 mode := A_Args.Length ? A_Args[1] : ""
@@ -29,6 +29,7 @@ sessionRegistration := false
 exitAfterWake := false
 screensBefore := Map()
 lightingBusy := false
+recoveryPid := 0
 sessionLocked := false
 residentReady := false
 coversLifted := true
@@ -104,6 +105,7 @@ if mode = "--test-rgb" {
 SetupTray()
 Persistent()
 residentReady := true
+SetTimer(() => RecoverPendingAura("startup"), -8000)
 Log("Ready v" VERSION ". Windows standby; off=" offHotkey "; wake=" wakeKey ".")
 if mode = "--settings"
     ShowSettings()
@@ -176,7 +178,11 @@ TurnOff(*) {
         RaiseNotice()
         UpdateTray("Off")
         Critical("Off")
-        ; 2) Lighting systems and their apps, hidden behind the covers.
+        ; 2) Lighting systems and their apps, hidden behind the covers. A recovery run that is still using
+        ;    Armoury Crate finishes first (they would fight over its window).
+        waited := A_TickCount
+        while recoveryPid && ProcessExist(recoveryPid) && A_TickCount-waited < 45000 && active
+            Sleep(100)
         lightingBusy := true
         try {
             WaitForLightingBeforeStandby(ObjBindMethod(lighting,"Darken"),
@@ -322,10 +328,38 @@ PollWake() {
     wakeGate.Poll(A_TickCount, coversLifted ? "restored" : "pending")
 }
 
+; A failed Armoury Crate restore leaves the ASUS lights on Dark and a marker file. Put them back as
+; soon as the desktop is unlocked and nothing else is using Armoury Crate.
+RecoverPendingAura(reason) {
+    global recoveryPid
+    marker := A_ScriptDir "\logs\aura-restore-pending.txt"
+    if !FileExist(marker) || active || busy || sessionLocked || wakeGate.pending
+        return
+    if !(lighting.cfg.aura && lighting.cfg.auraMethod = "profile")
+        return
+    if lighting.workerPid || (recoveryPid && ProcessExist(recoveryPid))
+        return
+    prefix := A_ScriptDir "\logs\aura-recover-" A_TickCount
+    command := '"' A_WinDir '\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -Mta -ExecutionPolicy Bypass -File "'
+        . A_ScriptDir '\AuraProfileWorker.ps1" -ParentId ' ProcessExist() ' -StatePrefix "' prefix '" -WakeEffect ' lighting.cfg.auraWake ' -RestoreOnly'
+    pid := 0
+    try Run(command, A_ScriptDir, "Hide", &pid)
+    catch Error as err {
+        Log("Could not start the ASUS lights recovery: " err.Message)
+        return
+    }
+    recoveryPid := pid
+    Log("ASUS lights were left on Dark by an earlier failed restore; restoring them now (" reason ").")
+}
+
 ; Runs the lighting restore that waited for an unlocked desktop. Needs the lock screen gone.
 RestoreLightingAfterUnlock() {
-    if sessionLocked || !lighting.HasDeferred()
+    if sessionLocked
         return
+    if !lighting.HasDeferred() {
+        RecoverPendingAura("after sign-in")
+        return
+    }
     count := lighting.RestoreDeferred()
     Log("Session unlocked: " count " deferred lighting restore(s) started.")
     SetTimer(WatchLightingRestore, 500)
@@ -334,7 +368,7 @@ RestoreLightingAfterUnlock() {
 WakeComplete() {
     global layoutValidUntil
     ; If Windows did not end up locked (lock failed or was skipped), do not keep Armoury waiting.
-    if !sessionLocked && lighting.HasDeferred()
+    if !sessionLocked
         SetTimer(RestoreLightingAfterUnlock, -500)
     SetTimer(PollWake,0)
     layoutValidUntil := A_TickCount + 15*60000
@@ -399,8 +433,7 @@ SessionChanged(event, sessionId, *) {
     } else if event = 8 {
         sessionLocked := false
         Log("Windows confirmed session unlocked.")
-        if lighting.HasDeferred()
-            SetTimer(RestoreLightingAfterUnlock, -1500)
+        SetTimer(RestoreLightingAfterUnlock, -1500)
         ; Windows can rearrange windows again when the desktop returns after sign-in.
         if layoutSnapshot.Length && A_TickCount < layoutValidUntil
             SetTimer(() => RestoreLayout("after sign-in"), -2000)

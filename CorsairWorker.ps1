@@ -5,7 +5,8 @@ param(
     [Parameter(Mandatory=$true)][int]$ParentId,
     [Parameter(Mandatory=$true)][string]$StatePrefix,
     [string]$Devices = 'keyboard,mouse,mousemat,headset,headsetstand',
-    [switch]$Probe
+    [switch]$Probe,
+    [switch]$Nudge
 )
 $ErrorActionPreference = 'Stop'
 # CorsairDeviceType bits from iCUESDK.h. Motherboard/GPU/touchbar are never requested:
@@ -31,7 +32,7 @@ function Write-Log([string]$Value) {
     try { [IO.File]::AppendAllText($StatePrefix + '.log', (Get-Date -Format o) + ' ' + $Value + [Environment]::NewLine, $encoding) } catch { }
 }
 
-$cue = $null; $failure = $null; $acquired = $false; $frames = 0
+$cue = $null; $failure = $null; $acquired = $false; $frames = 0; $softErrors = 0
 try {
     $mask = 0
     foreach ($name in ($Devices -split ',' | ForEach-Object { $_.Trim().ToLowerInvariant() } | Where-Object { $_ })) {
@@ -52,22 +53,61 @@ try {
     $found = $cue.Discover($SDK_DLL, $mask)
     $names = ($found | ForEach-Object { '{0} ({1} LEDs)' -f $_.Model, $_.LedCount }) -join '; '
     if ($Probe) { Set-Status ('AVAILABLE|' + $names + '. No colours changed.'); return }
+    if ($Nudge) {
+        # Take control and release at once: iCUE then re-applies its own lighting. Used when an
+        # earlier release happened while the session was locked and iCUE could not act on it.
+        $cue.Acquire($found)
+        Start-Sleep -Milliseconds 500
+        $cue.Dispose(); $cue = $null
+        Set-Status ('RESTORED|Corsair lighting handed back to iCUE (' + $names + ')')
+        Write-Log 'Nudge complete'
+        return
+    }
     Write-Log ('Devices: ' + $names)
     $cue.Acquire($found)
     $acquired = $true
     Write-Log ($cue.Verify())
     Set-Status ('APPLIED|' + $names)
     # Effects and iCUE's own refresh can overwrite one frame; keep resubmitting black.
+    # A locked session pauses iCUE's SDK and drops our control (26 Oct/1 Nov logs: "Lightings source is
+    # nullptr", "Removing connection"). Frames then fail; that must not end the worker: it waits for the
+    # stop request and reconnects below so iCUE can re-apply its lighting.
+    $softErrors = 0
     while (-not (Test-Path -LiteralPath ($StatePrefix + '.stop'))) {
-        $cue.Darken()
-        $frames++
-        if ($frames % 30 -eq 1) { Write-Log ('frames=' + $frames + '; ' + $cue.Verify()) }
+        try {
+            $cue.Darken()
+            $frames++
+            if ($frames % 30 -eq 1) { Write-Log ('frames=' + $frames + '; ' + $cue.Verify()) }
+        } catch {
+            $softErrors++
+            if ($softErrors -eq 1) { Write-Log ('Black frame failed (iCUE paused for a lock?): ' + $_.Exception.Message) }
+        }
         if ($parent.WaitForExit($FRAME_MS)) { break }
     }
 } catch {
     $failure = $_.Exception.Message
     Write-Log ('ERROR ' + $failure)
 } finally {
+    if ($null -ne $cue -and $acquired -and ($softErrors -gt 0 -or $cue.State -ne 6)) {
+        Write-Log ('iCUE session was interrupted (' + $softErrors + ' failed frames, state ' + $cue.State + '); reconnecting to hand lighting back')
+        try { $cue.Dispose() } catch { }
+        $cue = $null
+        for ($attempt = 1; $attempt -le 4 -and $null -eq $cue; $attempt++) {
+            $again = $null
+            try {
+                $again = New-Object CorsairLighting
+                $found2 = $again.Discover($SDK_DLL, $mask)
+                $again.Acquire($found2)
+                Start-Sleep -Milliseconds 500
+                $cue = $again
+                Write-Log ('Control re-acquired on attempt ' + $attempt)
+            } catch {
+                Write-Log ('Reconnect attempt ' + $attempt + ' failed: ' + $_.Exception.Message)
+                if ($null -ne $again) { try { $again.Dispose() } catch { } }
+                Start-Sleep -Seconds 3
+            }
+        }
+    }
     if ($null -ne $cue) {
         try { $cue.Dispose() } catch { $failure = 'Corsair release failed: ' + $_.Exception.Message }
     }

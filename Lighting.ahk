@@ -69,7 +69,9 @@ class LightingController {
     }
     ; Armoury Crate's restore clicks its own UI, which Windows does not allow on a locked desktop
     ; (27 Oct: a lock at the moment of release left the ASUS lights on Dark).
-    NeedsUnlockedSession() => this.kind = "aura" && this.cfg.auraMethod = "profile"
+    ; Corsair too: iCUE pauses its SDK and drops our control while locked (1 Nov: releasing during the
+    ; lock left the K100 black), so its hand-back is done after sign-in.
+    NeedsUnlockedSession() => (this.kind = "aura" && this.cfg.auraMethod = "profile") || this.kind = "corsair"
 
     ; True once the system has nothing that could appear on screen: no app window (non-UI
     ; systems), or the worker parked/closed it (<prefix>.hidden), or the worker is gone.

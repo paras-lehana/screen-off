@@ -105,6 +105,12 @@ try {
     lights.Darken()
     lights.Restore(false)
     Check(armoury2.restored && !lights.HasDeferred(), "Unlocked session restores everything at once")
+    ; Which real systems need an unlocked desktop: Armoury Crate's UI route and Corsair (iCUE pauses its SDK when locked).
+    profileCfg := {auraMethod:"profile", port:6742}, sdkCfg := {auraMethod:"sdk", port:6742}
+    Check(LightingController("aura", profileCfg).NeedsUnlockedSession(), "Aura profile (UI) waits for sign-in")
+    Check(!LightingController("aura", sdkCfg).NeedsUnlockedSession(), "Aura SDK does not need the UI")
+    Check(LightingController("corsair", sdkCfg).NeedsUnlockedSession(), "Corsair hand-back waits for sign-in")
+    Check(!LightingController("openrgb", sdkCfg).NeedsUnlockedSession(), "OpenRGB restores immediately")
     FileAppend("PASS " checks " lighting-set checks; fake controllers only.`n", "*")
 } catch Error as testError {
     FileAppend("FAIL " testError.Message "`n", "**")

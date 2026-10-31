@@ -30,6 +30,8 @@ public sealed class CorsairLighting : IDisposable {
     [DllImport(Dll, CallingConvention=CallingConvention.Cdecl, CharSet=CharSet.Ansi)] static extern int CorsairGetLedColors(string id, int size, [In,Out] Color[] colors);
     Changed handler;
     volatile int state;
+    // SDK session state (6 = connected, 4 = refused, 5 = lost); lets the worker notice a lost session.
+    public int State { get { return state; } }
     bool connected;
     readonly List<Device> owned = new List<Device>();
     readonly Dictionary<string,Color[]> frames = new Dictionary<string,Color[]>();

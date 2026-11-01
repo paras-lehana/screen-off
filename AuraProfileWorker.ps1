@@ -99,6 +99,12 @@ function Close-Window {
     $condition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,$AURA_WINDOW_NAME)
     $watch=[Diagnostics.Stopwatch]::StartNew()
     while($null -ne [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Children,$condition) -and $watch.ElapsedMilliseconds -lt 8000) { Start-Sleep -Milliseconds $AURA_UI_POLL_MS }
+    # 1 Nov: the closed window's UI process stayed alive and the "relaunch" reused it, still empty (the
+    # restore failed twice). End only that UI process (never the Armoury services) so a fresh one starts.
+    if($null -ne [System.Windows.Automation.AutomationElement]::RootElement.FindFirst([System.Windows.Automation.TreeScope]::Children,$condition)) {
+        Get-Process -Name 'ArmouryCrate' -ErrorAction SilentlyContinue | ForEach-Object { Write-Log ('Ending stuck Armoury Crate UI process ' + $_.Id); try { $_.Kill() } catch { } }
+        Start-Sleep -Milliseconds 1500
+    }
     $script:window=$null
 }
 function Open-Effects {

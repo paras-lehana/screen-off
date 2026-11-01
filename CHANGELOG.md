@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.20 — 1 November 2026
+- Fixed: the 1.19 empty-window recovery did not work on hardware. Closing the empty Armoury Crate window
+  left its UI process alive, the relaunch reused it and the restore failed again after 40 s ("control
+  unavailable"). When the window survives its close request the worker now ends the `ArmouryCrate` UI
+  process (not the services) so a fresh one starts. Checked by hand: after ending that process the same
+  restore selected Breathing in 8 s.
+- The Corsair hand-back worked at SDK level (iCUE log: exclusive control taken and released).
+
 ## 1.19 — 1 November 2026
 - Fixed: neither the ASUS lights nor the K100 came back after a wake where Windows locked the session.
   - Armoury Crate: its parked window could be open but empty after a lock (only the title bar was

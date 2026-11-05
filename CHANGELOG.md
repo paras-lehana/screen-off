@@ -4,7 +4,10 @@
 - Fixed: pressing off within seconds of a wake left the lights on while the screens went off. The previous
   ASUS/Corsair restore was still running, so both lighting systems were skipped ("previous worker is still
   restoring") and only the display was switched off (6 Nov 01:29:00, 3 s after a wake). Off now waits up to
-  60 s for that restore behind the covers, then switches the lights off as usual.
+  60 s for that restore behind the covers, then switches the lights off as usual (Esc still cancels).
+  New offline tests cover the wait, the 60 s limit and Esc.
+- New [REGRESSION-CHECKLIST.md](REGRESSION-CHECKLIST.md): every past problem with the check that proves it
+  is still fixed; the full list is run after any change and unrun physical checks are reported.
 - Correction to 1.20: its note that the Corsair hand-back "worked" only means iCUE accepted the SDK
   release. What the K100 shows afterwards is whatever iCUE profile is active; on 4-6 Nov that was the
   "Lights Off" profile, so the keyboard stayed dark. Select your normal profile in iCUE; Screen Off does

@@ -22,6 +22,8 @@ observed.
 3. Keep comments short and explain *why*. Match the surrounding style.
 4. New behaviour needs an offline test where possible (pure functions and fake controllers, like
    `test-lighting-set.ahk`). Hardware behaviour needs a person to watch it; say so in the PR.
+5. Go through the whole [regression checklist](REGRESSION-CHECKLIST.md), not only the rows for the part
+   you changed, and list the physical rows you could not run. A bug that reached a user gets a new row.
 
 ### Rules that protect people's hardware
 

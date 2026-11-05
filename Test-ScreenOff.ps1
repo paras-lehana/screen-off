@@ -39,3 +39,4 @@ Write-Output 'PASS PowerShell parsing, zero errors.'
 & (Join-Path $PSScriptRoot 'LightingHost\publish\ScreenOff.LightingHost.exe') --self-test
 if ($LASTEXITCODE -ne 0) { throw 'Backend simulation failed.' }
 Write-Output ('Evidence: ' + $output)
+Write-Output 'NOT RUN here: physical rows of REGRESSION-CHECKLIST.md (one real cycle at the PC).'

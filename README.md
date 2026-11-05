@@ -115,7 +115,8 @@ Workers write `logs\rgb-*.log` and `.status` files; the tray menu opens them.
 `.\Test-ScreenOff.ps1` runs the offline suite: AutoHotkey validation, configuration, wake/lock
 ordering, input release, standby preparation, monitor presence, lighting-set aggregation,
 PowerShell parsing and simulated OpenRGB protocol tests. Nothing in it turns screens or lights off.
-Physical behaviour still needs a person watching the hardware; please report it (see
+Physical behaviour still needs a person watching the hardware: every past problem has a check in
+[REGRESSION-CHECKLIST.md](REGRESSION-CHECKLIST.md), to be run in full after any change (see
 [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## Status

@@ -111,7 +111,25 @@ try {
     Check(!LightingController("aura", sdkCfg).NeedsUnlockedSession(), "Aura SDK does not need the UI")
     Check(LightingController("corsair", sdkCfg).NeedsUnlockedSession(), "Corsair hand-back waits for sign-in")
     Check(!LightingController("openrgb", sdkCfg).NeedsUnlockedSession(), "OpenRGB restores immediately")
-    FileAppend("PASS " checks " lighting-set checks; fake controllers only.`n", "*")
+    ; Off pressed while the previous restore is still running (6 Nov regression): wait, never skip.
+    busyWorker := LightingController("aura", profileCfg)
+    Run('"' A_WinDir '\System32\PING.EXE" -n 2 127.0.0.1', , "Hide", &shortPid)
+    busyWorker.workerPid := shortPid
+    started := A_TickCount
+    busyWorker.WaitForPreviousWorker(0, 10000)
+    Check(!ProcessExist(shortPid) && A_TickCount-started >= 300, "Off waits for a restore that is still running")
+    busyWorker.workerPid := DllCall("GetCurrentProcessId")
+    timedOut := false
+    try busyWorker.WaitForPreviousWorker(0, 300)
+    catch Error as caught
+        timedOut := InStr(caught.Message, "still restoring")
+    Check(timedOut, "A restore that never ends is reported after the limit")
+    escPressed := false
+    try busyWorker.WaitForPreviousWorker(() => true, 10000)
+    catch PreparationCancelled
+        escPressed := true
+    Check(escPressed, "Esc still cancels while waiting")
+    FileAppend("PASS " checks " lighting-set checks; fake controllers and a short ping process only.`n", "*")
 } catch Error as testError {
     FileAppend("FAIL " testError.Message "`n", "**")
     ExitApp(1)

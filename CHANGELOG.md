@@ -1,12 +1,22 @@
 # Changelog
 
+## 1.21 — 6 November 2026
+- Fixed: pressing off within seconds of a wake left the lights on while the screens went off. The previous
+  ASUS/Corsair restore was still running, so both lighting systems were skipped ("previous worker is still
+  restoring") and only the display was switched off (6 Nov 01:29:00, 3 s after a wake). Off now waits up to
+  60 s for that restore behind the covers, then switches the lights off as usual.
+- Correction to 1.20: its note that the Corsair hand-back "worked" only means iCUE accepted the SDK
+  release. What the K100 shows afterwards is whatever iCUE profile is active; on 4-6 Nov that was the
+  "Lights Off" profile, so the keyboard stayed dark. Select your normal profile in iCUE; Screen Off does
+  not switch iCUE profiles.
+
 ## 1.20 — 1 November 2026
 - Fixed: the 1.19 empty-window recovery did not work on hardware. Closing the empty Armoury Crate window
   left its UI process alive, the relaunch reused it and the restore failed again after 40 s ("control
   unavailable"). When the window survives its close request the worker now ends the `ArmouryCrate` UI
   process (not the services) so a fresh one starts. Checked by hand: after ending that process the same
   restore selected Breathing in 8 s.
-- The Corsair hand-back worked at SDK level (iCUE log: exclusive control taken and released).
+- (Corrected in 1.21: the Corsair release only returns control to iCUE; it does not choose a profile.)
 
 ## 1.19 — 1 November 2026
 - Fixed: neither the ASUS lights nor the K100 came back after a wake where Windows locked the session.

@@ -13,8 +13,19 @@ class LightingController {
     Darken(isCancelled := 0) {
         if IsObject(isCancelled)
             CheckPreparationCancellation(isCancelled)
-        if this.workerPid && ProcessExist(this.workerPid)
-            throw Error("The previous " this.label " worker is still restoring. Try again shortly.")
+        if this.workerPid && ProcessExist(this.workerPid) {
+            ; Off pressed right after a wake (6 Nov 01:29:00, 3 s after): the restore is still running. It was
+            ; skipped and the lights stayed on while the screens went off, so wait for it behind the covers.
+            waited := A_TickCount
+            while ProcessExist(this.workerPid) && A_TickCount-waited < 60000 {
+                if IsObject(isCancelled) && isCancelled.Call()
+                    CheckPreparationCancellation(isCancelled)
+                Sleep(100)
+            }
+            if ProcessExist(this.workerPid)
+                throw Error("The previous " this.label " worker is still restoring. Try again shortly.")
+            Log("Waited " Round((A_TickCount-waited)/1000, 1) " s for the previous " this.label " restore before switching off.")
+        }
         if this.HasOwnProp("restoreRequested")
             this.DeleteProp("restoreRequested")
         DirCreate(A_ScriptDir "\logs")

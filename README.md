@@ -119,6 +119,14 @@ Physical behaviour still needs a person watching the hardware: every past proble
 [REGRESSION-CHECKLIST.md](REGRESSION-CHECKLIST.md), to be run in full after any change (see
 [CONTRIBUTING.md](CONTRIBUTING.md)).
 
+## Why plain UI Automation (and not an agent tool)
+
+Armoury Crate is driven with Windows UI Automation called directly from PowerShell. In November 2026 we compared
+this with [agent-desktop](https://github.com/vercel-labs/agent-desktop), an accessibility-tree CLI built for AI
+agents. It found every control but refused to select the effect buttons, and each step took seconds. The full test,
+with a diagram of how both work: [research/2026-11-19-agent-desktop-vs-uia.md](research/2026-11-19-agent-desktop-vs-uia.md).
+agent-desktop is still handy for maintenance: when ASUS renames a control, map the new names with its `find` command.
+
 ## Status
 
 Version 1.21. Windows 10/11, AutoHotkey 2.0. Tested on one PC so far; see [SUPPORT.md](SUPPORT.md)

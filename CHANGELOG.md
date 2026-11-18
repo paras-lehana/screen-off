@@ -1,5 +1,10 @@
 # Changelog
 
+## Notes — 19 November 2026 (no code change)
+- Compared the Armoury Crate automation with agent-desktop 1.3.1 on real hardware; Screen Off keeps its own UI
+  Automation code. Write-up: [research/2026-11-19-agent-desktop-vs-uia.md](research/2026-11-19-agent-desktop-vs-uia.md).
+  The version before the study is tagged `v1.21`.
+
 ## 1.21 — 6 November 2026
 - Fixed: pressing off within seconds of a wake left the lights on while the screens went off. The previous
   ASUS/Corsair restore was still running, so both lighting systems were skipped ("previous worker is still
